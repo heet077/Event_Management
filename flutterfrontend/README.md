@@ -321,8 +321,3 @@ For support and questions:
 - **v1.1.0** - Enhanced inventory management
 - **v1.2.0** - Improved event management and cost tracking
 
----
-
-**Built with ❤️ using Flutter and Riverpod**
-
-*Last updated: December 2024*
