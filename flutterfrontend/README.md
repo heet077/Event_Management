@@ -1,4 +1,4 @@
-# AVD Decoration Frontend App
+Event Management
 
 A comprehensive Flutter application for managing decoration events, inventory, materials, and costs. Built with modern Flutter architecture and Riverpod state management.
 
