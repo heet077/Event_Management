@@ -1,0 +1,30 @@
+{
+  "name": "decoration-app",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "setup": "node setup-decorationapp.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "joi": "^17.9.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.11.3",
+    "readline": "^1.3.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "description": "A comprehensive backend system for managing decoration events and images with local file storage.",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
