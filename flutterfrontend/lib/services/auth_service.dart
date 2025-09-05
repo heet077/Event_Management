@@ -8,17 +8,23 @@ class AuthService {
 
   AuthService(this.baseUrl);
 
-  Future<UserModel> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(String username, String password) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/login'),
+      Uri.parse('$baseUrl/api/users/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
+      body: jsonEncode({'username': username, 'password': password}),
     );
 
     if (response.statusCode == 200) {
-      return UserModel.fromJson(jsonDecode(response.body));
+      final responseData = jsonDecode(response.body);
+      if (responseData['success'] == true) {
+        return responseData;
+      } else {
+        throw Exception(responseData['message'] ?? 'Login failed');
+      }
     } else {
-      throw Exception('Login failed');
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Login failed');
     }
   }
 

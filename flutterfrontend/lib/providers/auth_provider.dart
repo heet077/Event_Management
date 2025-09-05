@@ -43,10 +43,11 @@ class AuthNotifier extends StateNotifier<UserModel?> {
       print('Checking for saved user session...');
       final localStorage = ref.read(localStorageServiceProvider);
       final savedUserData = await localStorage.getUserData();
-      
+
       if (savedUserData != null) {
         state = savedUserData;
-        print('✅ Restored user session: ${savedUserData.username} (${savedUserData.role})');
+        print(
+            '✅ Restored user session: ${savedUserData.username} (${savedUserData.role})');
       } else {
         print('❌ No saved user session found');
       }
@@ -65,14 +66,15 @@ class AuthNotifier extends StateNotifier<UserModel?> {
     while (!_isInitialized) {
       await Future.delayed(const Duration(milliseconds: 100));
     }
-    
+
     try {
       final localStorage = ref.read(localStorageServiceProvider);
       final savedUserData = await localStorage.getUserData();
-      
+
       if (savedUserData != null) {
         state = savedUserData;
-        print('✅ Authentication status: Logged in as ${savedUserData.username}');
+        print(
+            '✅ Authentication status: Logged in as ${savedUserData.username}');
         return true;
       } else {
         state = null;
@@ -89,26 +91,48 @@ class AuthNotifier extends StateNotifier<UserModel?> {
   // Check if provider is ready
   bool get isReady => _isInitialized;
 
-  Future<void> login(String email, String password) async {
+  Future<void> login(String username, String password) async {
     ref.read(authLoadingProvider.notifier).state = true;
     ref.read(authErrorProvider.notifier).state = null;
 
     try {
-      final user = await ref.read(authServiceProvider).login(email, password);
-      
-      // Save user data to shared preferences
-      final localStorage = ref.read(localStorageServiceProvider);
-      await localStorage.saveUserData(user);
-      
-      state = user;
-      print('✅ User logged in and saved: ${user.username} (${user.role})');
+      final response =
+          await ref.read(authServiceProvider).login(username, password);
+
+      if (response['success'] == true) {
+        final userData = response['data']['user'];
+        final user = UserModel(
+          id: userData['id'],
+          username: userData['username'],
+          role: userData['role'],
+          email: userData['email'],
+          createdAt: userData['created_at'] != null
+              ? DateTime.parse(userData['created_at'])
+              : null,
+        );
+
+        // Save user data to shared preferences
+        final localStorage = ref.read(localStorageServiceProvider);
+        await localStorage.saveUserData(user);
+
+        state = user;
+        print('✅ User logged in and saved: ${user.username} (${user.role})');
+      } else {
+        throw Exception(response['message'] ?? 'Login failed');
+      }
     } catch (e) {
       state = null;
-      ref.read(authErrorProvider.notifier).state = 'Login failed. Please try again.';
+      ref.read(authErrorProvider.notifier).state =
+          'Login failed. Please try again.';
       print('❌ Login error: $e');
     } finally {
       ref.read(authLoadingProvider.notifier).state = false;
     }
+  }
+
+  // Method to update user state directly
+  void updateUser(UserModel user) {
+    state = user;
   }
 
   Future<void> register(UserModel user) async {
@@ -117,13 +141,14 @@ class AuthNotifier extends StateNotifier<UserModel?> {
 
     try {
       final newUser = await ref.read(authServiceProvider).register(user);
-      
+
       // Save user data to shared preferences
       final localStorage = ref.read(localStorageServiceProvider);
       await localStorage.saveUserData(newUser);
-      
+
       state = newUser;
-      print('✅ User registered and saved: ${newUser.username} (${newUser.role})');
+      print(
+          '✅ User registered and saved: ${newUser.username} (${newUser.role})');
     } catch (e) {
       state = null;
       ref.read(authErrorProvider.notifier).state = 'Registration failed.';
@@ -136,11 +161,11 @@ class AuthNotifier extends StateNotifier<UserModel?> {
   Future<void> logout() async {
     try {
       await ref.read(authServiceProvider).logout();
-      
+
       // Clear saved user data
       final localStorage = ref.read(localStorageServiceProvider);
       await localStorage.clearUserData();
-      
+
       state = null;
       print('✅ User logged out and data cleared');
     } catch (e) {
@@ -152,7 +177,7 @@ class AuthNotifier extends StateNotifier<UserModel?> {
 
   // Check if user is authenticated
   bool get isAuthenticated => state != null;
-  
+
   // Get current user
   UserModel? get currentUser => state;
 }

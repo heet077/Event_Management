@@ -1,5 +1,5 @@
 const String appName = "Your App Name";
-const String apiBaseUrl = "https://api.yourapp.com/";
+const String apiBaseUrl = "http://10.0.2.2:5000";
 const int defaultTimeout = 5000; // in milliseconds
 
 const String userTokenKey = "user_token";
