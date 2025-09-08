@@ -11,6 +11,7 @@ import costRoutes from './cost.routes.js';
 import issuanceRoutes from './issuance.routes.js';
 
 import inventoryRoutes from './inventory.routes.js';
+import dashboardRoutes from './dashboard.routes.js';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/costs', costRoutes);
 router.use('/issuance', issuanceRoutes);
 
 router.use('/inventory', inventoryRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 export default router;

@@ -216,6 +216,39 @@ json
 }
 
 
+### Get Event List
+*Endpoint:* POST /api/events/getList
+
+*Description:* Retrieve a simple list of event IDs and names (descriptions) for dropdowns or selection purposes
+
+*Request Body:*
+json
+{}
+
+
+*Response:*
+json
+{
+  "success": true,
+  "message": "Event list retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "name": "Beautiful wedding decoration setup"
+    },
+    {
+      "id": 2,
+      "name": "Corporate event decoration"
+    },
+    {
+      "id": 3,
+      "name": "Birthday party setup"
+    }
+  ],
+  "count": 3
+}
+
+
 ### Get Event by ID
 *Endpoint:* POST /api/events/getById
 
@@ -326,7 +359,7 @@ json
       "name": "Fabrics"
     }
   ]
-}
+} 
 
 
 #### Get Category by ID
@@ -425,6 +458,39 @@ json
     }
   ],
   "count": 1
+}
+
+
+#### Get Inventory Item List
+*Endpoint:* POST /api/inventory/items/getList
+
+*Description:* Retrieve a simple list of inventory item IDs and names for dropdowns or selection purposes
+
+*Request Body:*
+json
+{}
+
+
+*Response:*
+json
+{
+  "success": true,
+  "message": "Inventory item list retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "name": "Wooden Chair"
+    },
+    {
+      "id": 2,
+      "name": "Red Fabric"
+    },
+    {
+      "id": 3,
+      "name": "Metal Frame"
+    }
+  ],
+  "count": 3
 }
 
 
@@ -622,6 +688,173 @@ json
     }
   ],
   "count": 1
+}
+
+
+#### Get Material Issuance History by Item ID
+*Endpoint:* POST /api/inventory/issuances/getHistoryByItemId
+
+*Description:* Retrieve the complete issuance history for a specific inventory item, including all transactions (issuances and returns) with summary statistics
+
+*Request Body:*
+json
+{
+  "item_id": 1
+}
+
+
+*Response:*
+json
+{
+  "success": true,
+  "message": "Material issuance history retrieved successfully",
+  "data": {
+    "item_info": {
+      "id": 1,
+      "name": "Wooden Chair",
+      "category_name": "Furniture",
+      "unit": "piece",
+      "storage_location": "Warehouse A"
+    },
+    "issuance_history": [
+      {
+        "id": 1,
+        "item_id": 1,
+        "quantity_issued": 5,
+        "notes": "For wedding decoration",
+        "issued_at": "2024-01-15T10:30:00Z",
+        "transaction_type": "OUT",
+        "event_id": 1,
+        "item_name": "Wooden Chair",
+        "category_name": "Furniture",
+        "unit": "piece",
+        "storage_location": "Warehouse A"
+      },
+      {
+        "id": 2,
+        "item_id": 1,
+        "quantity_issued": 2,
+        "notes": "Returned after event",
+        "issued_at": "2024-01-16T14:20:00Z",
+        "transaction_type": "IN",
+        "event_id": 1,
+        "item_name": "Wooden Chair",
+        "category_name": "Furniture",
+        "unit": "piece",
+        "storage_location": "Warehouse A"
+      }
+    ],
+    "summary": {
+      "total_transactions": 2,
+      "total_issued": 5,
+      "total_returned": 2,
+      "net_issued": 3,
+      "current_stock": 47
+    },
+    "count": 2
+  }
+}
+
+
+#### Get Material Issuance History by Event ID
+*Endpoint:* POST /api/inventory/issuances/getHistoryByEventId
+
+*Description:* Retrieve all material issuance history for a specific event, including all inventory items used, transactions, and comprehensive summary statistics
+
+*Request Body:*
+json
+{
+  "event_id": 1
+}
+
+
+*Response:*
+json
+{
+  "success": true,
+  "message": "Event material issuance history retrieved successfully",
+  "data": {
+    "event_id": 1,
+    "issuance_history": [
+      {
+        "id": 1,
+        "item_id": 1,
+        "quantity_issued": 5,
+        "notes": "For wedding decoration",
+        "issued_at": "2024-01-15T10:30:00Z",
+        "transaction_type": "OUT",
+        "event_id": 1,
+        "item_name": "Wooden Chair",
+        "category_name": "Furniture",
+        "unit": "piece",
+        "storage_location": "Warehouse A",
+        "item_image": "/uploads/inventory/items/1/chair.jpg"
+      },
+      {
+        "id": 2,
+        "item_id": 2,
+        "quantity_issued": 10,
+        "notes": "Red fabric for decoration",
+        "issued_at": "2024-01-15T11:00:00Z",
+        "transaction_type": "OUT",
+        "event_id": 1,
+        "item_name": "Red Fabric",
+        "category_name": "Fabric",
+        "unit": "meters",
+        "storage_location": "Warehouse B",
+        "item_image": "/uploads/inventory/items/2/fabric.jpg"
+      }
+    ],
+    "issuances_by_item": [
+      {
+        "item_info": {
+          "id": 1,
+          "name": "Wooden Chair",
+          "category_name": "Furniture",
+          "unit": "piece",
+          "storage_location": "Warehouse A",
+          "item_image": "/uploads/inventory/items/1/chair.jpg"
+        },
+        "transactions": [
+          {
+            "id": 1,
+            "quantity_issued": 5,
+            "notes": "For wedding decoration",
+            "issued_at": "2024-01-15T10:30:00Z",
+            "transaction_type": "OUT"
+          }
+        ]
+      },
+      {
+        "item_info": {
+          "id": 2,
+          "name": "Red Fabric",
+          "category_name": "Fabric",
+          "unit": "meters",
+          "storage_location": "Warehouse B",
+          "item_image": "/uploads/inventory/items/2/fabric.jpg"
+        },
+        "transactions": [
+          {
+            "id": 2,
+            "quantity_issued": 10,
+            "notes": "Red fabric for decoration",
+            "issued_at": "2024-01-15T11:00:00Z",
+            "transaction_type": "OUT"
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "total_transactions": 2,
+      "total_items_used": 2,
+      "total_quantity_issued": 15,
+      "total_quantity_returned": 0,
+      "net_quantity_issued": 15,
+      "categories_used": ["Furniture", "Fabric"]
+    },
+    "count": 2
+  }
 }
 
 
@@ -1116,6 +1349,403 @@ curl -X POST http://localhost:5000/api/inventory/issuances/create \
 - All database operations use transactions for data consistency
 
 ---
+
+## 🗑️ Delete Inventory Item API
+
+### Delete Inventory Item
+
+**Endpoint:** `POST /api/inventory/items/delete`
+
+**Content-Type:** `application/json`
+
+**Request Body:**
+```json
+{
+  "id": 1
+}
+```
+
+**Parameters:**
+- `id` (integer, required): The ID of the inventory item to delete
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Inventory item deleted successfully from all related tables",
+  "data": {
+    "deleted_item": {
+      "id": 1,
+      "name": "Wooden Chair",
+      "category_id": 2,
+      "unit": "piece",
+      "storage_location": "Warehouse A",
+      "notes": "Beautiful wooden chair for events",
+      "item_image": "/uploads/inventory/items/1/chair.jpg",
+      "created_at": "2024-01-15T10:30:00Z",
+      "updated_at": "2024-01-16T14:20:00Z"
+    },
+    "category_name": "Furniture",
+    "deleted_from_tables": [
+      "inventory_items",
+      "inventory_stock",
+      "furniture"
+    ]
+  }
+}
+```
+
+**Error Responses:**
+
+**Item Not Found (404):**
+```json
+{
+  "success": false,
+  "error": "Inventory item not found"
+}
+```
+
+**Invalid ID (400):**
+```json
+{
+  "success": false,
+  "error": "Item ID must be a valid number"
+}
+```
+
+**Missing ID (400):**
+```json
+{
+  "success": false,
+  "error": "Item ID is required"
+}
+```
+
+**What Gets Deleted:**
+This API performs a comprehensive deletion that removes the inventory item from:
+
+1. **inventory_items** - Main inventory items table
+2. **inventory_stock** - Stock information for the item
+3. **Category-specific table** - Based on the item's category:
+   - Stationery → `stationery` table
+   - Furniture → `furniture` table
+   - Fabric → `fabric` table
+   - Frame Structures → `frame_structures` table
+   - Carpets → `carpets` table
+   - Thermocol Materials → `thermocol_materials` table
+   - Murti Sets → `murti_sets` table
+4. **Image files** - Associated image files are deleted from the filesystem
+5. **Empty directories** - Empty item directories are cleaned up
+
+**Example Usage:**
+
+**cURL:**
+```bash
+curl -X POST http://localhost:5000/api/inventory/items/delete \
+  -H "Content-Type: application/json" \
+  -d '{"id": 1}'
+```
+
+**JavaScript:**
+```javascript
+const deleteInventoryItem = async (itemId) => {
+  const response = await fetch('http://localhost:5000/api/inventory/items/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ id: itemId })
+  });
+  
+  const result = await response.json();
+  return result;
+};
+
+// Usage
+deleteInventoryItem(1).then(result => {
+  console.log('Item deleted:', result);
+});
+```
+
+**Python:**
+```python
+import requests
+
+def delete_inventory_item(item_id):
+    url = "http://localhost:5000/api/inventory/items/delete"
+    data = {"id": item_id}
+    
+    response = requests.post(url, json=data)
+    return response.json()
+
+# Usage
+result = delete_inventory_item(1)
+print("Item deleted:", result)
+```
+
+**PowerShell:**
+```powershell
+$body = @{
+    id = 1
+} | ConvertTo-Json
+
+$response = Invoke-RestMethod -Uri "http://localhost:5000/api/inventory/items/delete" -Method POST -Body $body -ContentType "application/json"
+Write-Output $response
+```
+
+**Important Notes:**
+- ⚠️ **This operation is irreversible** - once deleted, the item and all its data cannot be recovered
+- The deletion uses database transactions to ensure data integrity
+- Image files are automatically deleted from the filesystem
+- Empty directories are cleaned up after deletion
+- The API returns detailed information about what was deleted
+
+## 📊 Dashboard API
+
+### Get Dashboard Statistics
+*Endpoint:* POST /api/dashboard/stats
+
+*Description:* Retrieve comprehensive dashboard statistics including total counts, cost breakdown by year, recent events, and top categories
+
+*Request Body:*
+json
+{}
+
+
+*Response:*
+json
+{
+  "success": true,
+  "message": "Dashboard statistics retrieved successfully",
+  "data": {
+    "totals": {
+      "templates": 2,
+      "years": 5,
+      "events": 4,
+      "materials": 2
+    },
+    "cost_by_year": [
+      {
+        "year_id": 1,
+        "year": "2024",
+        "total_cost": 15000,
+        "event_count": 3
+      },
+      {
+        "year_id": 2,
+        "year": "2025",
+        "total_cost": 25000,
+        "event_count": 2
+      }
+    ],
+    "recent_events": [
+      {
+        "id": 1,
+        "name": "Wedding Decoration",
+        "date": "2024-06-15",
+        "location": "Grand Hotel",
+        "year": "2024",
+        "template_name": "Wedding",
+        "total_cost": 5000
+      },
+      {
+        "id": 2,
+        "name": "Corporate Event",
+        "date": "2024-05-20",
+        "location": "Convention Center",
+        "year": "2024",
+        "template_name": "Corporate",
+        "total_cost": 3000
+      }
+    ],
+    "top_categories": [
+      {
+        "id": 1,
+        "category_name": "Furniture",
+        "item_count": 15,
+        "total_stock": 120
+      },
+      {
+        "id": 2,
+        "category_name": "Fabric",
+        "item_count": 12,
+        "total_stock": 85
+      }
+    ]
+  }
+}
+
+
+### Get Total Counts Only
+*Endpoint:* POST /api/dashboard/counts
+
+*Description:* Retrieve only the total counts for templates, years, events, and materials
+
+*Request Body:*
+json
+{}
+
+
+*Response:*
+json
+{
+  "success": true,
+  "message": "Total counts retrieved successfully",
+  "data": {
+    "templates": 2,
+    "years": 5,
+    "events": 4,
+    "materials": 2
+  }
+}
+
+
+### Get Cost by Year (for Graphs)
+*Endpoint:* POST /api/dashboard/cost-by-year
+
+*Description:* Retrieve cost breakdown by year, perfect for creating charts and graphs
+
+*Request Body:*
+json
+{}
+
+
+*Response:*
+json
+{
+  "success": true,
+  "message": "Cost by year retrieved successfully",
+  "data": {
+    "cost_by_year": [
+      {
+        "year_id": 1,
+        "year": "2024",
+        "total_cost": 15000,
+        "event_count": 3
+      },
+      {
+        "year_id": 2,
+        "year": "2025",
+        "total_cost": 25000,
+        "event_count": 2
+      }
+    ],
+    "count": 2
+  }
+}
+
+
+### Get Recent Events
+*Endpoint:* POST /api/dashboard/recent-events
+
+*Description:* Retrieve the 5 most recent events with their details and costs
+
+*Request Body:*
+json
+{}
+
+
+*Response:*
+json
+{
+  "success": true,
+  "message": "Recent events retrieved successfully",
+  "data": {
+    "recent_events": [
+      {
+        "id": 1,
+        "name": "Wedding Decoration",
+        "date": "2024-06-15",
+        "location": "Grand Hotel",
+        "year": "2024",
+        "template_name": "Wedding",
+        "total_cost": 5000
+      }
+    ],
+    "count": 1
+  }
+}
+
+
+### Get Top Categories
+*Endpoint:* POST /api/dashboard/top-categories
+
+*Description:* Retrieve the top 5 categories by item count with stock information
+
+*Request Body:*
+json
+{}
+
+
+*Response:*
+json
+{
+  "success": true,
+  "message": "Top categories retrieved successfully",
+  "data": {
+    "top_categories": [
+      {
+        "id": 1,
+        "category_name": "Furniture",
+        "item_count": 15,
+        "total_stock": 120
+      }
+    ],
+    "count": 1
+  }
+}
+
+
+**Usage Examples:**
+
+**cURL (Complete Dashboard Stats):**
+```bash
+curl -X POST http://localhost:5000/api/dashboard/stats \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+**JavaScript (Cost by Year for Charts):**
+```javascript
+const getCostByYear = async () => {
+  const response = await fetch('http://localhost:5000/api/dashboard/cost-by-year', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  return response.json();
+};
+
+// Usage for chart data
+getCostByYear().then(result => {
+  const chartData = result.data.cost_by_year.map(year => ({
+    year: year.year,
+    cost: year.total_cost,
+    events: year.event_count
+  }));
+  console.log('Chart data:', chartData);
+});
+```
+
+**Python (Dashboard Statistics):**
+```python
+import requests
+
+def get_dashboard_stats():
+    url = "http://localhost:5000/api/dashboard/stats"
+    response = requests.post(url, json={})
+    return response.json()
+
+# Usage
+result = get_dashboard_stats()
+print("Total Events:", result['data']['totals']['events'])
+print("Total Materials:", result['data']['totals']['materials'])
+
+# Cost data for graphs
+cost_data = result['data']['cost_by_year']
+for year_data in cost_data:
+    print(f"Year {year_data['year']}: ₹{year_data['total_cost']}")
+```
 
 ## 🔧 Development
 

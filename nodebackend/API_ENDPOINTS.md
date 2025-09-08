@@ -1052,7 +1052,9 @@ POST /api/events/getDetails
 Content-Type: application/json
 ```
 
-**Example:**
+**Description:** Get comprehensive event details including gallery, costs, and issuances. Can be queried by event ID or by template_id and year_id.
+
+**Option 1 - By Event ID:**
 ```bash
 curl -X POST http://localhost:5000/api/events/getDetails \
   -H "Content-Type: application/json" \
@@ -1061,31 +1063,75 @@ curl -X POST http://localhost:5000/api/events/getDetails \
   }'
 ```
 
+**Option 2 - By Template ID and Year ID:**
+```bash
+curl -X POST http://localhost:5000/api/events/getDetails \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_id": 1,
+    "year_id": 2024
+  }'
+```
+
 **Response:**
 ```json
 {
-  "event": {
-    "id": 1,
-    "template_id": 1,
-    "year_id": 2024,
-    "date": "2024-02-15",
-    "location": "Grand Hotel",
-    "description": "Wedding decoration",
-    "cover_image": "https://drive.google.com/file/d/cover_image_1.jpg/view"
-  },
-  "gallery": {
-    "design": [...],
-    "final": [...]
-  },
-  "cost": {
-    "id": 1,
-    "event_id": 1,
-    "total_cost": 2500.00,
-    "materials_cost": 1500.00,
-    "labor_cost": 800.00,
-    "other_costs": 200.00
-  },
-  "issuances": [...]
+  "success": true,
+  "message": "Event details retrieved successfully",
+  "data": {
+    "event": {
+      "id": 1,
+      "template_id": 1,
+      "year_id": 2024,
+      "date": "2024-02-15",
+      "location": "Grand Hotel",
+      "description": "Wedding decoration",
+      "cover_image": "https://drive.google.com/file/d/cover_image_1.jpg/view"
+    },
+    "gallery": {
+      "design": [...],
+      "final": [...]
+    },
+    "cost": {
+      "id": 1,
+      "event_id": 1,
+      "total_cost": 2500.00,
+      "materials_cost": 1500.00,
+      "labor_cost": 800.00,
+      "other_costs": 200.00
+    },
+    "issuances": [...]
+  }
+}
+```
+
+**Error Responses:**
+
+**Missing Parameters (400):**
+```json
+{
+  "success": false,
+  "message": "Event identifier is required",
+  "details": [
+    {
+      "field": "id or template_id, year_id",
+      "message": "Either event ID or template_id and year_id are required in request body"
+    }
+  ]
+}
+```
+
+**Event Not Found (404):**
+```json
+{
+  "success": false,
+  "message": "Event not found",
+  "details": [
+    {
+      "field": "template_id, year_id",
+      "message": "Event with template_id 1 and year_id 2024 does not exist"
+    }
+  ]
 }
 ```
 
@@ -3173,4 +3219,68 @@ tail -f logs/app.log
 - Use HTTPS in production
 - Implement rate limiting
 - Log important operations
-- Regular database backups 
+- Regular database backups
+
+---
+
+## Gallery APIs
+
+### Get Event Images
+**POST** `/api/gallery/event/images`
+
+Retrieves all design images and final images for a specific event.
+
+**Request Body:**
+```json
+{
+  "event_id": 40
+}
+```
+
+**Parameters:**
+- `event_id` (body) - Event ID to retrieve images for
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Event images retrieved successfully",
+  "data": {
+    "event_id": 40,
+    "design_images": [
+      {
+        "id": 10,
+        "event_id": 40,
+        "image_url": "/uploads/events/40/design_images/design_images_1.png",
+        "notes": "Initial design concept",
+        "created_at": "2025-09-06T15:30:00.000Z"
+      }
+    ],
+    "final_images": [
+      {
+        "id": 5,
+        "event_id": 40,
+        "image_url": "/uploads/events/40/final_images/final_images_1.png",
+        "description": "Final decoration result",
+        "created_at": "2025-09-06T16:00:00.000Z"
+      }
+    ],
+    "design_count": 1,
+    "final_count": 1,
+    "total_images": 2
+  }
+}
+```
+
+**Example:**
+```bash
+curl -X POST http://localhost:5000/api/gallery/event/images \
+  -H "Content-Type: application/json" \
+  -d '{"event_id": 40}'
+```
+
+**Use Cases:**
+- Display event gallery
+- Before/after image comparison
+- Event documentation
+- Image count statistics 

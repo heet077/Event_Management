@@ -7,8 +7,18 @@ export const getAllEvents = async () => {
   return result.rows;
 };
 
+export const getEventList = async () => {
+  const result = await pool.query('SELECT id, description as name FROM events ORDER BY description ASC');
+  return result.rows;
+};
+
 export const getEventById = async (id) => {
   const result = await pool.query('SELECT * FROM events WHERE id=$1', [id]);
+  return result.rows[0];
+};
+
+export const getEventByTemplateAndYear = async (template_id, year_id) => {
+  const result = await pool.query('SELECT * FROM events WHERE template_id=$1 AND year_id=$2', [template_id, year_id]);
   return result.rows[0];
 };
 
