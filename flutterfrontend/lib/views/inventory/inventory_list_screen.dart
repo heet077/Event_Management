@@ -6,6 +6,7 @@ import '../../themes/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/inventory_provider.dart';
 import '../event/event_screen.dart';
+import '../../providers/event_provider.dart';
 import 'issue_inventory_screen.dart';
 import 'issued_items_screen.dart';
 import 'item_issue_history_screen.dart';
@@ -1006,7 +1007,16 @@ class InventoryIssueScreen extends ConsumerStatefulWidget {
 
 class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
   // Get real events from the event provider
-  List<Map<String, dynamic>> get currentEvents => ref.watch(eventListProvider);
+  List<Map<String, dynamic>> get currentEvents {
+    final events = ref.watch(eventProvider);
+    return events.map((e) => {
+      'id': e.id.toString(),
+      'name': e.name ?? '',
+      'date': e.date?.toIso8601String() ?? '',
+      'location': e.location ?? '',
+      'status': e.status ?? '',
+    }).toList();
+  }
 
   Map<String, dynamic>? selectedEvent;
   int issueQuantity = 1;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../themes/app_theme.dart';
 import '../../providers/inventory_provider.dart';
+import '../../providers/event_provider.dart';
 import '../event/event_screen.dart';
 
 class IssueInventoryPage extends ConsumerStatefulWidget {
@@ -19,7 +20,7 @@ class _IssueInventoryPageState extends ConsumerState<IssueInventoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final events = ref.watch(eventListProvider);
+    final events = ref.watch(eventProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -201,13 +202,20 @@ class _IssueInventoryPageState extends ConsumerState<IssueInventoryPage> {
                       child: Text('No events available', style: TextStyle(color: Colors.grey[600])),
                     )
                   else ...events.map((event) {
-                    final isSelected = selectedEvent?['id'] == event['id'];
+                    final eventMap = {
+                      'id': event.id.toString(),
+                      'name': event.name ?? '',
+                      'date': event.date?.toIso8601String() ?? '',
+                      'location': event.location ?? '',
+                      'status': event.status ?? '',
+                    };
+                    final isSelected = selectedEvent?['id'] == eventMap['id'];
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                       leading: Icon(Icons.event, color: isSelected ? AppColors.primary : Colors.grey[600]),
-                      title: Text(event['name']),
+                      title: Text(eventMap['name']!),
                       trailing: isSelected ? const Icon(Icons.check, color: Colors.green) : null,
-                      onTap: () => setState(() => selectedEvent = event),
+                      onTap: () => setState(() => selectedEvent = eventMap),
                     );
                   }),
                 ],

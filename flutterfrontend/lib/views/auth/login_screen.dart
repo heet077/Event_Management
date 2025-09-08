@@ -91,7 +91,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           id: userData['id'],
           username: userData['username'],
           role: userData['role'],
-          email: userData['email'],
+          email: userData['email'] ?? '', // Handle missing email field
           createdAt: userData['created_at'] != null
               ? DateTime.parse(userData['created_at'])
               : null,

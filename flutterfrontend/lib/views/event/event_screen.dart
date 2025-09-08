@@ -3,49 +3,14 @@ import '../../themes/app_theme.dart';
 import '../auth/login_screen.dart';
 import 'event_details_screen.dart';
 import 'add_event_screen.dart';
+import 'add_simple_event_screen.dart';
+import 'years_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../custom_widget/custom_searchbar.dart';
+import '../../providers/event_provider.dart';
+import '../../providers/template_provider.dart';
+import '../../models/event_model.dart';
+import '../../models/event_template_model.dart';
 
-/// ----------------------
-/// Riverpod Providers
-/// ----------------------
-final eventListProvider = StateNotifierProvider<EventListNotifier, List<Map<String, dynamic>>>(
-      (ref) => EventListNotifier(),
-);
-final filteredEventNamesProvider = StateProvider<List<String>>((ref) => []);
-
-class EventListNotifier extends StateNotifier<List<Map<String, dynamic>>> {
-  EventListNotifier() : super([
-    // Sample events to get started
-    {
-      'id': '1',
-      'name': 'Wedding Ceremony',
-      'date': '2024-02-15',
-      'location': 'Grand Hotel',
-      'client': 'John & Sarah',
-      'status': 'Active',
-    },
-    {
-      'id': '2',
-      'name': 'Corporate Event',
-      'date': '2024-02-20',
-      'location': 'Business Center',
-      'client': 'Tech Corp',
-      'status': 'Active',
-    },
-    {
-      'id': '3',
-      'name': 'Birthday Party',
-      'date': '2024-02-25',
-      'location': 'Community Hall',
-      'client': 'Mike Johnson',
-      'status': 'Active',
-    },
-  ]);
-  
-  void addEvent(Map<String, dynamic> event) => state = [...state, event];
-  void clear() => state = [];
-}
 
 /// ----------------------
 /// Event Screen
@@ -59,46 +24,22 @@ class EventScreen extends ConsumerStatefulWidget {
 }
 
 class _EventScreenState extends ConsumerState<EventScreen> {
-  final ScrollController _scrollController = ScrollController();
-  bool _isSearchBarVisible = true;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
 
-    // Initialize filtered events with all event names
+    // Fetch events and templates on screen load
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final allEvents = ref.read(eventListProvider).map((e) => e['name'] as String).toList();
-      ref.read(filteredEventNamesProvider.notifier).state = allEvents;
+      ref.read(eventProvider.notifier).fetchEvents();
+      ref.read(templateProvider.notifier).fetchTemplates();
     });
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
 
-  void _onScroll() {
-    if (_scrollController.offset > 50 && _isSearchBarVisible) {
-      setState(() => _isSearchBarVisible = false);
-    } else if (_scrollController.offset <= 50 && !_isSearchBarVisible) {
-      setState(() => _isSearchBarVisible = true);
-    }
-  }
+  void _editEvent(EventModel eventData) async {
+    final TextEditingController nameController = TextEditingController(text: eventData.name ?? '');
 
-  void _filterEvents(String query) {
-    final q = query.toLowerCase();
-    final allEvents = ref.read(eventListProvider).map((e) => e['name'] as String).toList();
-    ref.read(filteredEventNamesProvider.notifier).state = q.isEmpty
-        ? List.from(allEvents)
-        : allEvents.where((event) => event.toLowerCase().contains(q)).toList();
-  }
-
-  void _editEvent(Map<String, dynamic> eventData) async {
-    final TextEditingController nameController = TextEditingController(text: eventData['name']);
-    
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => AlertDialog(
@@ -124,9 +65,9 @@ class _EventScreenState extends ConsumerState<EventScreen> {
             onPressed: () {
               if (nameController.text.trim().isNotEmpty) {
                 Navigator.pop(context, {
-                  'id': eventData['id'],
+                  'id': eventData.id,
                   'name': nameController.text.trim(),
-                  'status': eventData['status'],
+                  'status': eventData.status,
                 });
               }
             },
@@ -136,51 +77,48 @@ class _EventScreenState extends ConsumerState<EventScreen> {
       ),
     );
 
-    if (result != null) {
-      final eventNotifier = ref.read(eventListProvider.notifier);
-      final events = eventNotifier.state;
-      final index = events.indexWhere((e) => e['id'] == eventData['id']);
-      if (index != -1) {
-        final updatedEvents = List<Map<String, dynamic>>.from(events);
-        updatedEvents[index] = result;
-        eventNotifier.state = updatedEvents;
-        
-        // Update filtered events
-        final allEvents = updatedEvents.map((e) => e['name'] as String).toList();
-        ref.read(filteredEventNamesProvider.notifier).state = allEvents;
-      }
+    if (result != null && eventData.id != null) {
+      final updatedEvent = EventModel(
+        id: eventData.id,
+        name: result['name'],
+        status: result['status'],
+        location: eventData.location,
+        description: eventData.description,
+        date: eventData.date,
+        templateId: eventData.templateId,
+        yearId: eventData.yearId,
+        coverImage: eventData.coverImage,
+        createdAt: eventData.createdAt,
+      );
+
+      await ref.read(eventProvider.notifier).updateEvent(eventData.id!, updatedEvent);
     }
   }
 
-  void _deleteEvent(Map<String, dynamic> eventData) {
+  void _deleteEvent(EventModel eventData) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Event'),
-        content: Text('Are you sure you want to delete "${eventData['name']}"?'),
+        content: Text('Are you sure you want to delete "${eventData.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              final eventNotifier = ref.read(eventListProvider.notifier);
-              final events = eventNotifier.state;
-              final updatedEvents = events.where((e) => e['id'] != eventData['id']).toList();
-              eventNotifier.state = updatedEvents;
-              
-              // Update filtered events
-              final allEvents = updatedEvents.map((e) => e['name'] as String).toList();
-              ref.read(filteredEventNamesProvider.notifier).state = allEvents;
-              
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${eventData['name']} deleted successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+            onPressed: () async {
+              if (eventData.id != null) {
+                await ref.read(eventProvider.notifier).deleteEvent(eventData.id!);
+
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${eventData.name} deleted successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
@@ -192,8 +130,8 @@ class _EventScreenState extends ConsumerState<EventScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allEventsData = ref.watch(eventListProvider);
-    final filteredEvents = ref.watch(filteredEventNamesProvider);
+    final allEventsData = ref.watch(eventProvider);
+    final templates = ref.watch(templateProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -250,87 +188,125 @@ class _EventScreenState extends ConsumerState<EventScreen> {
           ),
           child: Column(
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                height: _isSearchBarVisible ? 96 : 0, // 56 height + 20 top + 20 bottom
-                child: _isSearchBarVisible
-                    ? Container(
-                        margin: const EdgeInsets.all(20),
-                        child: CustomSearchBar(
-                          hintText: 'Search events...',
-                          debounceMs: 250,
-                          onQueryChanged: _filterEvents,
-                          onSubmitted: _filterEvents,
-                          padding: EdgeInsets.zero,
-                          borderRadius: 20,
-                          height: 56,
+              // Event Templates Section
+              if (templates.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Event Templates',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
                         ),
-                      )
-                    : null,
-              ),
-              Expanded(
-                child: filteredEvents.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(24),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          ref.read(templateProvider.notifier).fetchTemplates();
+                        },
+                        icon: const Icon(Icons.refresh, color: AppColors.primary),
+                        tooltip: 'Refresh Templates',
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    itemCount: templates.length,
+                    itemBuilder: (context, index) {
+                            final template = templates[index];
+                            final isEven = index % 2 == 0;
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 1),
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    AppColors.secondary.withOpacity(0.1),
-                                    AppColors.secondary.withOpacity(0.05),
-                                  ],
-                                ),
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.secondary.withOpacity(0.2),
-                                    blurRadius: 20,
-                                    spreadRadius: 2,
-                                    offset: const Offset(0, 8),
+                                color: isEven
+                                    ? const Color(0xFFF0F0F0)
+                                    : Colors.white,
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: Colors.grey.shade300,
+                                    width: 0.5,
                                   ),
-                                ],
+                                ),
                               ),
-                              child: Icon(
-                                Icons.search_off,
-                                size: 60,
-                                color: AppColors.secondary,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    // Navigate to YearsScreen when template is clicked
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => YearsScreen(
+                                          template: template,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 50,
+                                          height: 50,
+                                          decoration: BoxDecoration(
+                                            color: isEven
+                                                ? const Color(0xFF25D366)
+                                                : const Color(0xFF128C7E),
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: const Icon(
+                                            Icons.description,
+                                            color: Colors.white,
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                template.name,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 16,
+                                                  color: isEven
+                                                      ? const Color(0xFF075E54)
+                                                      : const Color(0xFF128C7E),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.chevron_right,
+                                          color: Colors.grey.shade400,
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'No events found',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Try searching with different keywords',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: AppColors.secondary,
-                              ),
-                            ),
-                          ],
+                            );
+                          },
                         ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
+                  ),
+              ],
+              // Events List Section
+              Container(
+                height: MediaQuery.of(context).size.height * 0.0, // Fixed height for events list
+                child: ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
-                        itemCount: filteredEvents.length,
+                        itemCount: allEventsData.length,
                         itemBuilder: (context, index) {
-                          final eventName = filteredEvents[index];
-                          final eventData = allEventsData.firstWhere(
-                                (e) => e['name'] == eventName,
-                            orElse: () => {},
-                          );
+                          final eventData = allEventsData[index];
                           return Container(
                             margin: const EdgeInsets.only(bottom: 20),
                             decoration: BoxDecoration(
@@ -367,11 +343,17 @@ class _EventScreenState extends ConsumerState<EventScreen> {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(24),
                                 onTap: () {
-                                  if (eventData.isNotEmpty) {
+                                  if (eventData.id != null) {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
                                         builder: (_) => EventDetailsScreen(
-                                          eventData: eventData,
+                                          eventData: {
+                                            'id': eventData.id.toString(),
+                                            'name': eventData.name ?? '',
+                                            'date': eventData.date?.toIso8601String() ?? '',
+                                            'location': eventData.location ?? '',
+                                            'status': eventData.status ?? '',
+                                          },
                                           isAdmin: widget.isAdmin,
                                         ),
                                       ),
@@ -416,21 +398,21 @@ class _EventScreenState extends ConsumerState<EventScreen> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              eventName,
+                                              eventData.name ?? 'Unnamed Event',
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 18,
                                                 color: AppColors.primary,
                                               ),
                                             ),
-                                                                                         const SizedBox(height: 4),
-                                             Text(
-                                               'Event ID: ${eventData['id']}',
-                                               style: TextStyle(
-                                                 fontSize: 12,
-                                                 color: Colors.grey.shade500,
-                                               ),
-                                             ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Event ID: ${eventData.id ?? 'N/A'}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey.shade500,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -467,7 +449,13 @@ class _EventScreenState extends ConsumerState<EventScreen> {
                                             Navigator.of(context).push(
                                               MaterialPageRoute(
                                                 builder: (_) => EventDetailsScreen(
-                                                  eventData: eventData,
+                                                  eventData: {
+                                                    'id': eventData.id.toString(),
+                                                    'name': eventData.name ?? '',
+                                                    'date': eventData.date?.toIso8601String() ?? '',
+                                                    'location': eventData.location ?? '',
+                                                    'status': eventData.status ?? '',
+                                                  },
                                                   isAdmin: widget.isAdmin,
                                                 ),
                                               ),
@@ -517,7 +505,7 @@ class _EventScreenState extends ConsumerState<EventScreen> {
                           );
                         },
                       ),
-              ),
+                ),
             ],
           ),
         ),
@@ -544,15 +532,12 @@ class _EventScreenState extends ConsumerState<EventScreen> {
                              child: FloatingActionButton.extended(
                  heroTag: "event_add_button", // Added unique hero tag
                  onPressed: () async {
-                   final newEvent = await Navigator.of(context).push(
-                     MaterialPageRoute(builder: (_) => const AddEventScreen()),
+                   await Navigator.of(context).push(
+                     MaterialPageRoute(builder: (_) => const AddSimpleEventScreen()),
                    );
-                   if (newEvent != null && newEvent is Map<String, dynamic>) {
-                     ref.read(eventListProvider.notifier).addEvent(newEvent);
-                     final allEvents =
-                         ref.read(eventListProvider).map((e) => e['name'] as String).toList();
-                     ref.read(filteredEventNamesProvider.notifier).state = allEvents;
-                   }
+                   // Refresh the event list and templates after adding
+                   ref.read(eventProvider.notifier).fetchEvents();
+                   ref.read(templateProvider.notifier).fetchTemplates();
                  },
                 icon: Container(
                   padding: const EdgeInsets.all(4),

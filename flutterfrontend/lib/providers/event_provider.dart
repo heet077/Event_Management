@@ -28,6 +28,26 @@ class EventNotifier extends StateNotifier<List<EventModel>> {
     }
   }
 
+  Future<List<EventModel>> getAllEvents() async {
+    try {
+      final events = await service.getAllEvents();
+      return events;
+    } catch (e) {
+      print('Error fetching all events: $e');
+      return [];
+    }
+  }
+
+  Future<List<EventModel>> fetchEventsByYear(int yearId) async {
+    try {
+      final events = await service.fetchEventsByYear(yearId);
+      return events;
+    } catch (e) {
+      print('Error fetching events by year: $e');
+      return [];
+    }
+  }
+
   Future<void> addEvent(EventModel event) async {
     try {
       await service.createEvent(event);

@@ -9,7 +9,7 @@ import 'dart:io';
 
 import '../../../themes/app_theme.dart';
 
-final costProvider = StateNotifierProvider.family<CostNotifier, List<Map<String, dynamic>>, String>((ref, eventName) => CostNotifier());
+final costProvider = StateNotifierProvider.family<CostNotifier, List<Map<String, dynamic>>, String>((ref, eventId) => CostNotifier());
 
 class CostNotifier extends StateNotifier<List<Map<String, dynamic>>> {
   CostNotifier() : super([]);
@@ -178,7 +178,7 @@ class CostTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final costs = ref.watch(costProvider(event['name']));
+    final costs = ref.watch(costProvider(event['id'].toString()));
     final totalCost = _calculateTotalCost(costs);
     
     return Container(
@@ -1477,7 +1477,7 @@ class CostTab extends ConsumerWidget {
                                   onPressed: () {
                                     if (_formKey.currentState!.validate()) {
                                       _formKey.currentState!.save();
-                                      ref.read(costProvider(event['name']).notifier).addCost({
+                                      ref.read(costProvider(event['id'].toString()).notifier).addCost({
                                         'description': description,
                                         'amount': double.tryParse(amount) ?? 0.0,
                                         'date': DateFormat('yyyy-MM-dd').format(date),
@@ -2148,7 +2148,7 @@ class CostTab extends ConsumerWidget {
                                   onPressed: () {
                                     if (_formKey.currentState!.validate()) {
                                       _formKey.currentState!.save();
-                                      ref.read(costProvider(event['name']).notifier).updateCost(index, {
+                                      ref.read(costProvider(event['id'].toString()).notifier).updateCost(index, {
                                         'description': description,
                                         'amount': double.tryParse(amount) ?? 0.0,
                                         'date': DateFormat('yyyy-MM-dd').format(date),
@@ -2385,7 +2385,7 @@ class CostTab extends ConsumerWidget {
                           ),
                           child: ElevatedButton(
                             onPressed: () {
-                              ref.read(costProvider(event['name']).notifier).deleteCost(index);
+                              ref.read(costProvider(event['id'].toString()).notifier).deleteCost(index);
                               Navigator.of(context).pop();
                             },
                             style: ElevatedButton.styleFrom(

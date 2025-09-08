@@ -22,10 +22,13 @@ class TemplateNotifier extends StateNotifier<List<EventTemplateModel>> {
 
   Future<void> fetchTemplates() async {
     try {
+      print('Fetching templates from API...');
       final templates = await service.fetchTemplates();
+      print('Successfully fetched ${templates.length} templates');
       state = templates;
     } catch (e) {
       print('Error fetching templates: $e');
+      // Keep the current state on error, don't clear it
     }
   }
 

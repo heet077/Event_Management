@@ -1,235 +1,502 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../themes/app_theme.dart';
-import '../../../providers/inventory_provider.dart';
 
 class MaterialTab extends ConsumerStatefulWidget {
   final Map<String, dynamic> event;
   final bool isAdmin;
 
-  const MaterialTab({Key? key, required this.event, required this.isAdmin}) : super(key: key);
+  const MaterialTab({Key? key, required this.event, required this.isAdmin})
+      : super(key: key);
 
   @override
   ConsumerState<MaterialTab> createState() => _MaterialTabState();
 }
 
 class _MaterialTabState extends ConsumerState<MaterialTab> {
-  Map<String, dynamic>? selectedItem;
-  int issueQuantity = 1;
+  // List to store issued inventory items for this event
+  List<Map<String, dynamic>> issuedInventoryItems = [];
+
+  // Available items for dropdown - populated from API
+  List<Map<String, dynamic>> availableItems = [];
+  bool isLoadingItems = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load inventory items when the widget initializes
+    _loadInventoryItems();
+    // Load saved issued items
+    _loadSavedIssuedItems();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final inventoryItems = ref.watch(inventoryProvider);
-    
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.white, Colors.grey.shade50],
-          stops: const [0.0, 0.3],
-        ),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            // Header Section
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.primary.withOpacity(0.1),
-                    AppColors.primary.withOpacity(0.05),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.1),
-                    blurRadius: 20,
-                    spreadRadius: 0,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header Row
-                  Row(
-                children: [
-                      Expanded(
-                        child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                              'Available Inventory',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
+    print(
+        'Building MaterialTab with ${issuedInventoryItems.length} issued items');
+    if (issuedInventoryItems.isNotEmpty) {
+      print('Issued items: $issuedInventoryItems');
+    }
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          // Refresh both available items and issued items
+          await _refreshAllData();
+        },
+        color: AppColors.primary,
+        backgroundColor: Colors.white,
+        strokeWidth: 3.0,
+        displacement: 60.0,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (ScrollNotification scrollInfo) {
+            // This ensures the RefreshIndicator works properly
+            return false;
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+                // Refresh Status Indicator
+                if (isLoadingItems) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary.withOpacity(0.1),
+                          AppColors.primary.withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                              'Total: ${inventoryItems.length} items',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Event: ${widget.event['name']} (${widget.event['year']})',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
-                      ),
-                    ],
-                  ),
-                  
-                  // Issue Button Row (only show when item is selected)
-                  if (widget.isAdmin && selectedItem != null) ...[
-                    const SizedBox(height: 16),
-                    Center(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.3),
-                              blurRadius: 15,
-                              spreadRadius: 0,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton.icon(
-                          onPressed: () => _showIssueDialog(context, selectedItem!),
-                          icon: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.send, color: Colors.white, size: 20),
-                          ),
-                          label: const Text(
-                            'Issue to Event',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Refreshing Data...',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              'Loading inventory items and issued items',
+                              style: TextStyle(
+                                color: AppColors.primary.withOpacity(0.7),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-                  
-                  // User access message
-                  if (!widget.isAdmin) ...[
-                    const SizedBox(height: 16),
-                    Container(
+
+                // Available Inventory Items Count Only
+                if (availableItems.isNotEmpty) ...[
+                  // Header for available items (count only)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.inventory, color: Colors.blue, size: 24),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Available Inventory Items (${availableItems.length})',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Issued Inventory Items Section
+                if (issuedInventoryItems.isNotEmpty) ...[
+                  // Header for issued items
+                  GestureDetector(
+                    onLongPress: () {
+                      // Show confirmation dialog to clear items
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Clear All Issued Items'),
+                          content: const Text(
+                              'Are you sure you want to clear all issued items? This action cannot be undone.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _clearIssuedItems();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Clear All'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
                       padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                  color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.blue.withOpacity(0.3),
-                          width: 1,
-                        ),
+                            color: AppColors.primary.withOpacity(0.3)),
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: Colors.blue,
-                            size: 20,
-                          ),
+                          Icon(Icons.inventory_2,
+                              color: AppColors.primary, size: 24),
                           const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'You have read-only access. Contact an administrator to issue inventory items.',
-                              style: TextStyle(
-                                color: Colors.blue[700],
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
+                          Text(
+                            'Issued Inventory Items (${issuedInventoryItems.length})',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
                             ),
                           ),
-                        ],
+                          const Spacer(),
+                          Icon(
+                            Icons.info_outline,
+                            color: AppColors.primary.withOpacity(0.6),
+                            size: 16,
+                ),
+              ],
+            ),
+                    ),
+                  ),
+                  // Issued items list
+                  ...issuedInventoryItems.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final item = entry.value;
+                    return _buildSwipeableIssuedInventoryCard(item, index);
+                  }),
+                ],
+
+                // Loading indicator
+                if (isLoadingItems) ...[
+                  Container(
+                    padding: const EdgeInsets.all(40),
+                    child: Column(
+                      children: [
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Loading inventory items...',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // No Items Available Message (when both lists are empty and not loading)
+                if (availableItems.isEmpty &&
+                    issuedInventoryItems.isEmpty &&
+                    !isLoadingItems) ...[
+                  Container(
+                    padding: const EdgeInsets.all(40),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.grey.shade50,
+                      border: Border.all(
+                        color: Colors.grey.shade200,
+                        width: 1,
                       ),
                     ),
-                  ],
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            size: 64,
+                            color: AppColors.primary.withOpacity(0.6),
+                          ),
+          ),
+          const SizedBox(height: 24),
+                        Text(
+                          'No Inventory Available',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'There are no inventory items to display.\nAdd some items to get started.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        if (widget.isAdmin)
+                          ElevatedButton.icon(
+                            onPressed: () => _showAddInventoryDialog(context),
+                            icon: const Icon(Icons.add, color: Colors.white),
+                            label: const Text(
+                              'Add Inventory',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.blue.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Contact an administrator to add inventory items.',
+                                    style: TextStyle(
+                                      color: Colors.blue[700],
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
-            const SizedBox(height: 24),
-            
-            // Inventory Items List
-            ...inventoryItems.map((item) => _buildInventoryCard(item.toMap())),
-          ],
+          ),
         ),
       ),
+      floatingActionButton: widget.isAdmin
+          ? FloatingActionButton.extended(
+              onPressed: () => _showAddInventoryDialog(context),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text(
+                'Add Inventory',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              elevation: 4,
+            )
+          : null,
     );
   }
 
-  Widget _buildInventoryCard(Map<String, dynamic> item) {
-    final isSelected = selectedItem?['id'] == item['id'];
-    
-    return GestureDetector(
-      onTap: () => setState(() => selectedItem = isSelected ? null : item),
-          child: Container(
+  Widget _buildSwipeableIssuedInventoryCard(Map<String, dynamic> item, int index) {
+    return Dismissible(
+      key: Key('issued_item_${item['id']}_$index'),
+      direction: DismissDirection.endToStart, // Swipe right to left
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: Colors.orange,
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.keyboard_return,
+              color: Colors.white,
+              size: 32,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Return to\nInventory',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        // Show confirmation dialog
+        final shouldDismiss = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Return Item to Inventory'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Are you sure you want to return this item to inventory?'),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Item: ${item['name'] ?? 'Unknown'}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text('Quantity: ${item['quantity'] ?? 0}'),
+                      if (item['notes'] != null && item['notes'].isNotEmpty)
+                        Text('Notes: ${item['notes']}'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Return to Inventory'),
+              ),
+        ],
+      ),
+    );
+        
+        // If user confirmed, remove item immediately
+        if (shouldDismiss == true) {
+          _returnItemToInventory(item, index);
+        }
+        
+        return shouldDismiss;
+      },
+      child: _buildIssuedInventoryCard(item),
+    );
+  }
+
+  Widget _buildIssuedInventoryCard(Map<String, dynamic> item) {
+    return Container(
         margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-            colors: isSelected 
-                ? [AppColors.primary.withOpacity(0.1), AppColors.primary.withOpacity(0.05)]
-                : [Colors.white, Colors.grey.shade50],
+          colors: [Colors.white, Colors.grey.shade50],
               ),
               boxShadow: [
                 BoxShadow(
-              color: isSelected 
-                  ? AppColors.primary.withOpacity(0.2)
-                  : Colors.black.withOpacity(0.06),
+            color: Colors.black.withOpacity(0.06),
                   blurRadius: 25,
                   spreadRadius: 0,
                   offset: const Offset(0, 10),
                 ),
               ],
               border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.grey.shade200,
-            width: isSelected ? 2 : 1,
+          color: Colors.grey.shade200,
+          width: 1,
               ),
             ),
             child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Row(
+        child: Column(
                 children: [
-              // Item Image or Icon
+            Row(
+              children: [
+                // Item Icon
                       Container(
                 width: 70,
                 height: 70,
@@ -241,25 +508,10 @@ class _MaterialTabState extends ConsumerState<MaterialTab> {
                             width: 1,
                           ),
                 ),
-                child: item['imageBytes'] != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: Image.memory(
-                          item['imageBytes'],
-                                  fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              _getCategoryIcon(item['category']),
+                  child: Icon(
+                    _getCategoryIcon(item['category'] ?? 'General'),
                                     color: AppColors.primary,
                               size: 32,
-                            );
-                          },
-                                  ),
-                                )
-                              : Icon(
-                        _getCategoryIcon(item['category']),
-                                  color: AppColors.primary,
-                        size: 32,
                                 ),
                         ),
               const SizedBox(width: 16),
@@ -270,22 +522,23 @@ class _MaterialTabState extends ConsumerState<MaterialTab> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                      item['name'],
-                              style: TextStyle(
+                        item['name'] ?? 'Unknown Item',
+                        style: const TextStyle(
                         fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                        color: isSelected ? AppColors.primary : Colors.black87,
+                          color: Colors.black87,
                               ),
                             ),
                             const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        item['category'],
+                          item['category'] ?? 'General',
                               style: TextStyle(
                           fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -293,209 +546,148 @@ class _MaterialTabState extends ConsumerState<MaterialTab> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.style,
-                          size: 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            item['material'] ?? 'N/A',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
                     ],
                   ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            item['location'] ?? 'N/A',
-                              style: TextStyle(
-                                fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-              
-              // Quantity and Status
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                    Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                      color: _getStatusColor(item['status']).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                        color: _getStatusColor(item['status']),
-                          width: 1,
-                        ),
-                      ),
-                    child: Text(
-                      item['status'],
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: _getStatusColor(item['status']),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Qty: ${item['quantity']}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-              
-              // Selection Indicator
-              if (isSelected)
-                          Container(
-                  margin: const EdgeInsets.only(left: 12),
-                  padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 16,
-                  ),
                 ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
-  void _showIssueDialog(BuildContext context, Map<String, dynamic> item) {
-    issueQuantity = 1;
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.send, color: AppColors.primary, size: 24),
-              const SizedBox(width: 8),
-              const Text('Issue to Event'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                'Issue ${item['name']} to ${widget.event['name']}?',
-                style: const TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Text('Quantity: ', style: TextStyle(fontSize: 16)),
-                  IconButton(
-                    onPressed: issueQuantity > 1
-                        ? () => setDialogState(() => issueQuantity--)
-                        : null,
-                    icon: Icon(Icons.remove_circle_outline, color: issueQuantity > 1 ? AppColors.primary : Colors.grey),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      issueQuantity.toString(),
-                                  style: TextStyle(
-                        fontSize: 18,
+                // Quantity
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                    Text(
+                      'Qty: ${item['quantity'] ?? 0}',
+                      style: TextStyle(
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border:
+                            Border.all(color: Colors.green.withOpacity(0.3)),
+                      ),
+                          child: Text(
+                        'ISSUED',
+                            style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[700],
+                            ),
+                        ),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    onPressed: issueQuantity < item['quantity']
-                        ? () => setDialogState(() => issueQuantity++)
-                        : null,
-                    icon: Icon(
-                      Icons.add_circle_outline, 
-                      color: issueQuantity < item['quantity'] ? AppColors.primary : Colors.grey
+              ],
+            ),
+
+            // Notes and Stock Info section
+            const SizedBox(height: 12),
+                    Row(
+                      children: [
+                // Notes section
+                if (item['notes'] != null && item['notes'].isNotEmpty) ...[
+                        Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.note,
+                                  size: 16, color: Colors.blue[600]),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Notes:',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item['notes'],
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.blue[600],
+                            ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+
+                // Stock info section
+                if (item['stock_info'] != null) ...[
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: Colors.orange.withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.inventory,
+                                  size: 16, color: Colors.orange[600]),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Stock:',
+                      style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                  Text(
+                            '${item['stock_info']['new_quantity']} remaining',
+                    style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.orange[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'Changed: ${item['stock_info']['change']}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange[600],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-                                Text(
-                'Available: ${item['quantity']} | Remaining: ${item['quantity'] - issueQuantity}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                  color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                ref.read(inventoryProvider.notifier).issueInventory(
-                  item['id'], 
-                  issueQuantity, 
-                  widget.event['name']
-                );
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${issueQuantity} × ${item['name']} issued to ${widget.event['name']}'),
-                    backgroundColor: Colors.green,
+                    ),
                   ),
-                );
-                setState(() {
-                  selectedItem = null;
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Issue'),
-            ),
-          ],
+                ],
+              ],
+                ),
+            ],
+          ),
         ),
-      ),
     );
   }
 
@@ -520,16 +712,835 @@ class _MaterialTabState extends ConsumerState<MaterialTab> {
     }
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'In Stock':
-        return Colors.green;
-      case 'Low Stock':
-        return Colors.orange;
-      case 'Out of Stock':
-        return Colors.red;
-      default:
-        return Colors.grey;
+  Future<List<Map<String, dynamic>>> _fetchInventoryItems() async {
+    const String apiUrl =
+        'http://10.115.47.136:5000/api/inventory/items/getList';
+
+    try {
+      print('Fetching inventory items from: $apiUrl');
+
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          // Add authorization header if needed
+          // 'Authorization': 'Bearer $token',
+        },
+        body: json.encode({}), // Empty body for POST request
+      );
+
+      print('Items API Response status code: ${response.statusCode}');
+      print('Items API Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        try {
+          final responseData = json.decode(response.body);
+          print('Parsed response data: $responseData');
+
+          // Handle your specific API response structure
+          if (responseData is Map &&
+              responseData['success'] == true &&
+              responseData['data'] != null) {
+            final items = List<Map<String, dynamic>>.from(responseData['data']);
+            print('Extracted items: $items');
+            return items;
+          } else if (responseData is List) {
+            return List<Map<String, dynamic>>.from(responseData);
+          } else if (responseData is Map && responseData['data'] != null) {
+            return List<Map<String, dynamic>>.from(responseData['data']);
+          } else if (responseData is Map && responseData['items'] != null) {
+            return List<Map<String, dynamic>>.from(responseData['items']);
+          } else {
+            print('Unexpected response structure: $responseData');
+            return [];
+          }
+        } catch (e) {
+          print('Error parsing items response: $e');
+          return [];
+        }
+      } else {
+        print('Failed to fetch items: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      print('Network error fetching items: $e');
+      return [];
     }
+  }
+
+  Future<Map<String, dynamic>> _updateInventoryIssuance(
+      Map<String, dynamic> updateData) async {
+    const String apiUrl =
+        'http://10.115.47.136:5000/api/inventory/issuances/update';
+
+    try {
+      print('Making API call to: $apiUrl');
+      print('Request data: $updateData');
+
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          // Add authorization header if needed
+          // 'Authorization': 'Bearer $token',
+        },
+        body: json.encode(updateData),
+      );
+
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        try {
+          final responseData = json.decode(response.body);
+          return responseData;
+        } catch (e) {
+          return {
+            'success': false,
+            'message': 'Invalid JSON response: ${e.toString()}',
+          };
+        }
+      } else {
+        // Handle HTTP error
+        try {
+          final errorData = json.decode(response.body);
+          return {
+            'success': false,
+            'message': errorData['error'] ??
+                errorData['message'] ??
+                'HTTP Error: ${response.statusCode}',
+          };
+        } catch (e) {
+          return {
+            'success': false,
+            'message': 'HTTP Error: ${response.statusCode} - ${response.body}',
+          };
+        }
+      }
+    } catch (e) {
+      // Handle network or parsing errors
+      print('Network error: $e');
+      return {
+        'success': false,
+        'message': 'Network Error: ${e.toString()}',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> _createInventoryIssuance(
+      Map<String, dynamic> transactionData) async {
+    const String apiUrl =
+        'http://10.115.47.136:5000/api/inventory/issuances/create';
+
+    try {
+      print('Making API call to: $apiUrl');
+      print('Request data: $transactionData');
+
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          // Add authorization header if needed
+          // 'Authorization': 'Bearer $token',
+        },
+        body: json.encode(transactionData),
+      );
+
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        try {
+          final responseData = json.decode(response.body);
+          return responseData;
+        } catch (e) {
+          return {
+            'success': false,
+            'message': 'Invalid JSON response: ${e.toString()}',
+          };
+        }
+      } else {
+        // Handle HTTP error
+        try {
+          final errorData = json.decode(response.body);
+          return {
+            'success': false,
+            'message': errorData['error'] ??
+                errorData['message'] ??
+                'HTTP Error: ${response.statusCode}',
+          };
+        } catch (e) {
+          return {
+            'success': false,
+            'message': 'HTTP Error: ${response.statusCode} - ${response.body}',
+          };
+        }
+      }
+    } catch (e) {
+      // Handle network or parsing errors
+      print('Network error: $e');
+      return {
+        'success': false,
+        'message': 'Network Error: ${e.toString()}',
+      };
+    }
+  }
+
+  // Save issued items to local storage
+  Future<void> _saveIssuedItems() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final eventId = widget.event['id']?.toString() ?? 'unknown';
+      final key = 'issued_items_event_$eventId';
+
+      // Convert list to JSON string
+      final itemsJson = json.encode(issuedInventoryItems);
+      await prefs.setString(key, itemsJson);
+
+      print(
+          'Saved ${issuedInventoryItems.length} issued items for event $eventId');
+    } catch (e) {
+      print('Error saving issued items: $e');
+    }
+  }
+
+  // Load issued items from local storage
+  Future<void> _loadSavedIssuedItems() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final eventId = widget.event['id']?.toString() ?? 'unknown';
+      final key = 'issued_items_event_$eventId';
+
+      final itemsJson = prefs.getString(key);
+      if (itemsJson != null && itemsJson.isNotEmpty) {
+        final List<dynamic> itemsList = json.decode(itemsJson);
+        final loadedItems = itemsList.cast<Map<String, dynamic>>();
+
+        setState(() {
+          issuedInventoryItems = loadedItems;
+        });
+
+        print(
+            'Loaded ${issuedInventoryItems.length} saved issued items for event $eventId');
+      } else {
+        print('No saved issued items found for event $eventId');
+      }
+    } catch (e) {
+      print('Error loading saved issued items: $e');
+    }
+  }
+
+  // Return item to inventory
+  void _returnItemToInventory(Map<String, dynamic> item, int index) async {
+    print('Returning item to inventory: $item');
+    
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      // Prepare the API request data
+      final returnData = {
+        "id": item['issuance_id'], // The issuance ID from when item was issued
+        "item_id": item['id'],
+        "transaction_type": "IN", // IN means returning to inventory
+        "quantity": item['quantity'],
+        "event_id": widget.event['id'] ?? 0,
+        "notes": "Returned to inventory: ${item['notes'] ?? 'No notes'}"
+      };
+
+      print('Making return API call with data: $returnData');
+
+      // Make API call to update issuance
+      final response = await _updateInventoryIssuance(returnData);
+
+      // Close loading dialog
+      Navigator.pop(context);
+
+      if (response['success'] == true) {
+        // Remove item from the list
+        setState(() {
+          issuedInventoryItems.removeAt(index);
+        });
+        
+        // Save updated list to local storage
+        _saveIssuedItems();
+        
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Item returned to inventory successfully!',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text('Item: ${item['name']} (Qty: ${item['quantity']})'),
+                  Text('Stock updated: ${response['data']['stock_update']['new_quantity']} available'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'Undo',
+                textColor: Colors.white,
+                onPressed: () {
+                  // Add item back to the list
+                  setState(() {
+                    issuedInventoryItems.insert(index, item);
+                  });
+                  _saveIssuedItems();
+                },
+              ),
+            ),
+          );
+        }
+      } else {
+        // API call failed, but we can still remove item locally
+        setState(() {
+          issuedInventoryItems.removeAt(index);
+        });
+        
+        _saveIssuedItems();
+        
+        // Show warning message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Item returned locally (API Error)',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text('Item: ${item['name']} (Qty: ${item['quantity']})'),
+                  Text('Error: ${response['message'] ?? 'API connection failed'}'),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.pop(context);
+      
+      // Remove item locally even if API fails
+      setState(() {
+        issuedInventoryItems.removeAt(index);
+      });
+      
+      _saveIssuedItems();
+      
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Item returned locally (Network Error)',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text('Item: ${item['name']} (Qty: ${item['quantity']})'),
+                Text('Error: ${e.toString()}'),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  // Clear all issued items (for testing/reset purposes)
+  Future<void> _clearIssuedItems() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final eventId = widget.event['id']?.toString() ?? 'unknown';
+      final key = 'issued_items_event_$eventId';
+
+      await prefs.remove(key);
+      setState(() {
+        issuedInventoryItems.clear();
+      });
+
+      print('Cleared all issued items for event $eventId');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All issued items cleared'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error clearing issued items: $e');
+    }
+  }
+
+  // Refresh all data (available items and issued items)
+  Future<void> _refreshAllData() async {
+    print('Refreshing all data...');
+    
+    // Refresh available inventory items from API
+    await _loadInventoryItems();
+    
+    // Reload issued items from local storage
+    await _loadSavedIssuedItems();
+    
+    print('All data refreshed successfully');
+  }
+
+  Future<void> _loadInventoryItems() async {
+    if (isLoadingItems) return;
+
+    setState(() {
+      isLoadingItems = true;
+    });
+
+    try {
+      final items = await _fetchInventoryItems();
+      print('Loaded ${items.length} items: $items');
+      setState(() {
+        availableItems = items;
+        isLoadingItems = false;
+      });
+
+    } catch (e) {
+      setState(() {
+        isLoadingItems = false;
+      });
+      print('Error loading inventory items: $e');
+
+    }
+  }
+
+  void _showAddInventoryDialog(BuildContext context) {
+    final TextEditingController quantityController = TextEditingController();
+    final TextEditingController notesController = TextEditingController();
+    Map<String, dynamic>? selectedItem;
+    List<Map<String, dynamic>> dialogItems = [];
+    bool dialogLoadingItems = false;
+
+    // Function to add item to main widget's list
+    void addIssuedItem(Map<String, dynamic> item) {
+      print('Adding issued item: $item');
+      setState(() {
+        issuedInventoryItems.add(item);
+      });
+      print('Total issued items: ${issuedInventoryItems.length}');
+
+      // Save to local storage
+      _saveIssuedItems();
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          // Load items when dialog first opens
+          if (dialogItems.isEmpty && !dialogLoadingItems) {
+            dialogLoadingItems = true;
+            _fetchInventoryItems().then((items) {
+              if (context.mounted) {
+                setDialogState(() {
+                  dialogItems = items;
+                  dialogLoadingItems = false;
+                });
+              }
+            }).catchError((e) {
+              if (context.mounted) {
+                setDialogState(() {
+                  dialogLoadingItems = false;
+                });
+              }
+            });
+          }
+
+          return AlertDialog(
+          title: Row(
+            children: [
+                // Icon(Icons.add, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+                const Text('Issue Inventory Item'),
+            ],
+          ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+            mainAxisSize: MainAxisSize.min,
+                              children: [
+                    // Item Selection Dropdown
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: dialogLoadingItems
+                          ? const Padding(
+                              padding: EdgeInsets.all(12.0),
+                              child: Row(
+                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text('Loading items...'),
+                                ],
+                              ),
+                            )
+                          : DropdownButtonHideUnderline(
+                              child: DropdownButton<Map<String, dynamic>>(
+                                value: selectedItem,
+                                hint: dialogItems.isEmpty
+                                    ? const Text('No items available')
+                                    : const Text('Select an item'),
+                                isExpanded: true,
+                                items: dialogItems.map((item) {
+                                  return DropdownMenuItem<Map<String, dynamic>>(
+                                    value: item,
+                                    child: Row(
+                                      children: [
+                  Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                item['name'] ??
+                                                    item['item_name'] ??
+                                                    'Unknown Item',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                              Text(
+                                                item['category'] ??
+                                                    item['item_category'] ??
+                                                    'General',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          'ID: ${item['id'] ?? item['item_id'] ?? 'N/A'}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: dialogItems.isEmpty
+                                    ? null
+                                    : (Map<String, dynamic>? newValue) {
+                                        setDialogState(() {
+                                          selectedItem = newValue;
+                                        });
+                                      },
+                              ),
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Selected Item Info
+                    if (selectedItem != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppColors.primary.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.check_circle,
+                                color: AppColors.primary, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                    child: Text(
+                                'Selected: ${selectedItem!['name'] ?? selectedItem!['item_name']} (${selectedItem!['category'] ?? selectedItem!['item_category']})',
+                                  style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                        color: AppColors.primary,
+                                  fontSize: 14,
+                      ),
+                    ),
+                  ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    TextField(
+                      controller: quantityController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Quantity',
+                        border: OutlineInputBorder(),
+                        hintText: 'Enter quantity (e.g., 5)',
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Notes',
+                        border: OutlineInputBorder(),
+                        hintText: 'Enter notes (e.g., For event decoration)',
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                              ],
+                ),
+              ),
+                            ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+                onPressed: () async {
+                  // Validate inputs
+                  if (selectedItem == null || quantityController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content:
+                            Text('Please select an item and enter quantity'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Create the transaction data
+                  final transactionData = {
+                    "item_id": selectedItem!['id'] ?? selectedItem!['item_id'],
+                    "transaction_type": "OUT",
+                    "quantity": int.tryParse(quantityController.text) ?? 0,
+                    "event_id": widget.event['id'] ?? 0,
+                    "notes": notesController.text.isNotEmpty
+                        ? notesController.text
+                        : "For event decoration"
+                  };
+
+                  // Show loading indicator
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+
+                  try {
+                    // Make API call to create issuance
+                    final response =
+                        await _createInventoryIssuance(transactionData);
+
+                    // Close loading dialog
+                Navigator.pop(context);
+
+                    if (response['success'] == true) {
+                      // Add the issued item to the list with API response data
+                      final issuedItem = {
+                        "id": selectedItem!['id'] ?? selectedItem!['item_id'],
+                        "name":
+                            selectedItem!['name'] ?? selectedItem!['item_name'],
+                        "category": selectedItem!['category'] ??
+                            selectedItem!['item_category'],
+                        "quantity": int.tryParse(quantityController.text) ?? 0,
+                        "notes": notesController.text.isNotEmpty
+                            ? notesController.text
+                            : "For event decoration",
+                        "issued_date": response['data']['issuance']
+                            ['issued_at'],
+                        "issuance_id": response['data']['issuance']['id'],
+                        "stock_info": response['data']['stock_update'],
+                      };
+
+                      addIssuedItem(issuedItem);
+
+                      // Close the dialog
+                      Navigator.pop(context);
+
+                      // Show success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Inventory item issued successfully!',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              Text('Item: ${selectedItem!['name']}'),
+                              Text('Quantity: ${transactionData['quantity']}'),
+                              Text(
+                                  'Stock: ${response['data']['stock_update']['new_quantity']} remaining'),
+                            ],
+                          ),
+                    backgroundColor: Colors.green,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                    } else {
+                      // API call failed, but we can still add item locally for demo purposes
+                      final issuedItem = {
+                        "id": selectedItem!['id'] ?? selectedItem!['item_id'],
+                        "name":
+                            selectedItem!['name'] ?? selectedItem!['item_name'],
+                        "category": selectedItem!['category'] ??
+                            selectedItem!['item_category'],
+                        "quantity": int.tryParse(quantityController.text) ?? 0,
+                        "notes": notesController.text.isNotEmpty
+                            ? notesController.text
+                            : "For event decoration",
+                        "issued_date": DateTime.now().toIso8601String(),
+                        "issuance_id": null,
+                        "stock_info": null,
+                      };
+
+                      addIssuedItem(issuedItem);
+
+                      // Close the dialog
+                      Navigator.pop(context);
+
+                      // Show warning message
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'API Error - Item added locally',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              Text('Item: ${selectedItem!['name']}'),
+                              Text('Quantity: ${transactionData['quantity']}'),
+                              Text(
+                                  'Error: ${response['message'] ?? 'API connection failed'}'),
+                            ],
+                          ),
+                          backgroundColor: Colors.orange,
+                          duration: const Duration(seconds: 5),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    // Close loading dialog
+                    Navigator.pop(context);
+
+                    // Add item locally even if API fails
+                    final issuedItem = {
+                      "id": selectedItem!['id'] ?? selectedItem!['item_id'],
+                      "name":
+                          selectedItem!['name'] ?? selectedItem!['item_name'],
+                      "category": selectedItem!['category'] ??
+                          selectedItem!['item_category'],
+                      "quantity": int.tryParse(quantityController.text) ?? 0,
+                      "notes": notesController.text.isNotEmpty
+                          ? notesController.text
+                          : "For event decoration",
+                      "issued_date": DateTime.now().toIso8601String(),
+                      "issuance_id": null,
+                      "stock_info": null,
+                    };
+
+                    addIssuedItem(issuedItem);
+
+                    // Close the dialog
+                    Navigator.pop(context);
+
+                    // Show error message
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Item added locally (Network Error)',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text('Item: ${selectedItem!['name']}'),
+                            Text('Error: ${e.toString()}'),
+                          ],
+                        ),
+                        backgroundColor: Colors.orange,
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                  }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+                child: const Text('Issue Item'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }

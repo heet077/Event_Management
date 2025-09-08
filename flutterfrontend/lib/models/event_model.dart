@@ -1,22 +1,26 @@
 class EventModel {
-  final int id;
-  final int templateId;
-  final int yearId;
-  final DateTime date;
-  final String location;
+  final int? id;
+  final int? templateId;
+  final int? yearId;
+  final DateTime? date;
+  final String? location;
   final String? description;
   final String? coverImage;
-  final DateTime createdAt;
+  final DateTime? createdAt;
+  final String? name;
+  final String? status;
 
   EventModel({
-    required this.id,
-    required this.templateId,
-    required this.yearId,
-    required this.date,
-    required this.location,
+    this.id,
+    this.templateId,
+    this.yearId,
+    this.date,
+    this.location,
     this.description,
     this.coverImage,
-    required this.createdAt,
+    this.createdAt,
+    this.name,
+    this.status,
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
@@ -24,11 +28,13 @@ class EventModel {
       id: json['id'],
       templateId: json['template_id'],
       yearId: json['year_id'],
-      date: DateTime.parse(json['date']),
+      date: json['date'] != null ? DateTime.parse(json['date']) : null,
       location: json['location'],
       description: json['description'],
       coverImage: json['cover_image'],
-      createdAt: DateTime.parse(json['created_at']),
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
+      name: json['name'],
+      status: json['status'],
     );
   }
 
@@ -36,10 +42,12 @@ class EventModel {
     return {
       'template_id': templateId,
       'year_id': yearId,
-      'date': date.toIso8601String(),
+      'date': date?.toIso8601String(),
       'location': location,
       'description': description,
       'cover_image': coverImage,
+      'name': name,
+      'status': status,
     };
   }
 }

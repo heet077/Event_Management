@@ -21,10 +21,19 @@ class YearNotifier extends StateNotifier<List<YearModel>> {
 
   Future<void> fetchYears() async {
     try {
+      print('YearProvider: Starting to fetch years...');
       final years = await service.fetchYears();
+      print('YearProvider: Received ${years.length} years from service');
       state = years;
+      print('YearProvider: State updated with ${state.length} years');
+      
+      // Force a rebuild by setting state again
+      if (mounted) {
+        state = [...years];
+      }
     } catch (e) {
-      print('Error fetching years: $e');
+      print('YearProvider: Error fetching years: $e');
+      state = []; // Set empty state on error
     }
   }
 
