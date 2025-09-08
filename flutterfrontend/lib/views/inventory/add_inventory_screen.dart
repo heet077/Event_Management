@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/category_model.dart';
 
 enum InventoryCategory {
   furniture,
@@ -54,55 +55,73 @@ extension InventoryCategoryExtension on InventoryCategory {
 class InventoryFormNotifier extends StateNotifier<InventoryFormState> {
   InventoryFormNotifier() : super(const InventoryFormState());
 
-  void selectCategory(InventoryCategory category) {
+  void selectCategory(CategoryModel category) {
     state = state.copyWith(selectedCategory: category);
   }
 
   void updateFurnitureData({
     String? name,
-    String? category,
     String? material,
     String? dimensions,
+    String? unit,
+    String? notes,
+    String? storageLocation,
     int? quantity,
-    String? location,
   }) {
     final furniture = state.furniture.copyWith(
       name: name,
-      category: category,
       material: material,
       dimensions: dimensions,
+      unit: unit,
+      notes: notes,
+      storageLocation: storageLocation,
       quantity: quantity,
-      location: location,
     );
     state = state.copyWith(furniture: furniture);
   }
 
   void updateFabricData({
+    String? name,
     String? type,
     String? pattern,
-    String? color,
     double? width,
     double? length,
-    int? stock,
+    String? color,
+    String? unit,
+    String? storageLocation,
+    String? notes,
+    double? stock,
   }) {
     final fabric = state.fabric.copyWith(
+      name: name,
       type: type,
       pattern: pattern,
-      color: color,
       width: width,
       length: length,
+      color: color,
+      unit: unit,
+      storageLocation: storageLocation,
+      notes: notes,
       stock: stock,
     );
     state = state.copyWith(fabric: fabric);
   }
 
   void updateFrameData({
+    String? name,
+    String? unit,
+    String? storageLocation,
+    String? notes,
     String? type,
     String? material,
     String? dimensions,
     int? quantity,
   }) {
     final frame = state.frame.copyWith(
+      name: name,
+      unit: unit,
+      storageLocation: storageLocation,
+      notes: notes,
       type: type,
       material: material,
       dimensions: dimensions,
@@ -112,12 +131,20 @@ class InventoryFormNotifier extends StateNotifier<InventoryFormState> {
   }
 
   void updateCarpetData({
+    String? name,
+    String? unit,
+    String? storageLocation,
+    String? notes,
     String? type,
     String? material,
     String? size,
     int? stock,
   }) {
     final carpet = state.carpet.copyWith(
+      name: name,
+      unit: unit,
+      storageLocation: storageLocation,
+      notes: notes,
       type: type,
       material: material,
       size: size,
@@ -127,50 +154,66 @@ class InventoryFormNotifier extends StateNotifier<InventoryFormState> {
   }
 
   void updateThermocolData({
-    String? type,
+    String? name,
+    String? unit,
+    String? storageLocation,
+    String? notes,
+    int? quantity,
+    String? thermocolType,
     String? dimensions,
     double? density,
-    int? stock,
   }) {
     final thermocol = state.thermocol.copyWith(
-      type: type,
+      name: name,
+      unit: unit,
+      storageLocation: storageLocation,
+      notes: notes,
+      quantity: quantity,
+      thermocolType: thermocolType,
       dimensions: dimensions,
       density: density,
-      stock: stock,
     );
     state = state.copyWith(thermocol: thermocol);
   }
 
   void updateStationeryData({
     String? name,
-    String? category,
-    String? specs,
     String? unit,
+    String? storageLocation,
+    String? notes,
     int? quantity,
+    String? specifications,
   }) {
     final stationery = state.stationery.copyWith(
       name: name,
-      category: category,
-      specs: specs,
       unit: unit,
+      storageLocation: storageLocation,
+      notes: notes,
       quantity: quantity,
+      specifications: specifications,
     );
     state = state.copyWith(stationery: stationery);
   }
 
   void updateMurtiData({
-    String? deity,
+    String? name,
+    String? unit,
+    String? storageLocation,
+    String? notes,
+    int? quantity,
+    String? setNumber,
     String? material,
     String? dimensions,
-    double? weight,
-    int? quantity,
   }) {
     final murti = state.murti.copyWith(
-      deity: deity,
+      name: name,
+      unit: unit,
+      storageLocation: storageLocation,
+      notes: notes,
+      quantity: quantity,
+      setNumber: setNumber,
       material: material,
       dimensions: dimensions,
-      weight: weight,
-      quantity: quantity,
     );
     state = state.copyWith(murti: murti);
   }
@@ -179,12 +222,13 @@ class InventoryFormNotifier extends StateNotifier<InventoryFormState> {
     state = const InventoryFormState();
   }
 
-  void setImage({required Uint8List bytes, required String name}) {
-    state = state.copyWith(imageBytes: bytes, imageName: name);
+  void setImage(
+      {required Uint8List bytes, required String name, String? path}) {
+    state = state.copyWith(imageBytes: bytes, imageName: name, imagePath: path);
   }
 
   void clearImage() {
-    state = state.copyWith(imageBytes: null, imageName: null);
+    state = state.copyWith(imageBytes: null, imageName: null, imagePath: null);
   }
 
   void setLocation(String value) {
@@ -192,46 +236,98 @@ class InventoryFormNotifier extends StateNotifier<InventoryFormState> {
   }
 
   bool validateForm() {
-    switch (state.selectedCategory) {
-      case InventoryCategory.furniture:
+    if (state.selectedCategory == null) return false;
+
+    final categoryName = state.selectedCategory!.name.toLowerCase();
+
+    switch (categoryName) {
+      case 'furniture':
+        return state.furniture.name?.isNotEmpty == true &&
+            state.furniture.material?.isNotEmpty == true &&
+            state.furniture.dimensions?.isNotEmpty == true &&
+            state.furniture.unit?.isNotEmpty == true &&
+            state.furniture.notes?.isNotEmpty == true &&
+            state.furniture.storageLocation?.isNotEmpty == true &&
+            (state.furniture.quantity ?? 0) > 0;
+      case 'fabric':
+      case 'fabrics':
+        return state.fabric.name?.isNotEmpty == true &&
+            state.fabric.type?.isNotEmpty == true &&
+            state.fabric.pattern?.isNotEmpty == true &&
+            state.fabric.width != null &&
+            state.fabric.width! > 0 &&
+            state.fabric.length != null &&
+            state.fabric.length! > 0 &&
+            state.fabric.color?.isNotEmpty == true &&
+            state.fabric.unit?.isNotEmpty == true &&
+            state.fabric.storageLocation?.isNotEmpty == true &&
+            state.fabric.notes?.isNotEmpty == true &&
+            state.fabric.stock != null &&
+            state.fabric.stock! > 0;
+      case 'frame structure':
+      case 'frame structures':
+        return state.frame.name?.isNotEmpty == true &&
+            state.frame.unit?.isNotEmpty == true &&
+            state.frame.storageLocation?.isNotEmpty == true &&
+            state.frame.notes?.isNotEmpty == true &&
+            state.frame.type?.isNotEmpty == true &&
+            state.frame.material?.isNotEmpty == true &&
+            state.frame.dimensions?.isNotEmpty == true &&
+            (state.frame.quantity ?? 0) > 0;
+      case 'carpet':
+      case 'carpets':
+        return state.carpet.name?.isNotEmpty == true &&
+            state.carpet.unit?.isNotEmpty == true &&
+            state.carpet.storageLocation?.isNotEmpty == true &&
+            state.carpet.notes?.isNotEmpty == true &&
+            state.carpet.type?.isNotEmpty == true &&
+            state.carpet.material?.isNotEmpty == true &&
+            state.carpet.size?.isNotEmpty == true &&
+            (state.carpet.stock ?? 0) > 0;
+      case 'thermocol':
+      case 'thermocol material':
+      case 'thermocol materials':
+        return state.thermocol.name?.isNotEmpty == true &&
+            state.thermocol.unit?.isNotEmpty == true &&
+            state.thermocol.storageLocation?.isNotEmpty == true &&
+            state.thermocol.notes?.isNotEmpty == true &&
+            state.thermocol.thermocolType?.isNotEmpty == true &&
+            state.thermocol.dimensions?.isNotEmpty == true &&
+            (state.thermocol.density ?? 0) > 0 &&
+            (state.thermocol.quantity ?? 0) > 0;
+      case 'stationery':
+        return state.stationery.name?.isNotEmpty == true &&
+            state.stationery.unit?.isNotEmpty == true &&
+            state.stationery.storageLocation?.isNotEmpty == true &&
+            state.stationery.notes?.isNotEmpty == true &&
+            state.stationery.specifications?.isNotEmpty == true &&
+            (state.stationery.quantity ?? 0) > 0;
+      case 'murti set':
+      case 'murti sets':
+        return state.murti.name?.isNotEmpty == true &&
+            state.murti.unit?.isNotEmpty == true &&
+            state.murti.storageLocation?.isNotEmpty == true &&
+            state.murti.notes?.isNotEmpty == true &&
+            state.murti.setNumber?.isNotEmpty == true &&
+            state.murti.material?.isNotEmpty == true &&
+            state.murti.dimensions?.isNotEmpty == true &&
+            (state.murti.quantity ?? 0) > 0;
+      default:
+        // For any other category, use furniture validation as default
         return state.furniture.name?.isNotEmpty == true &&
             state.furniture.material?.isNotEmpty == true &&
             (state.furniture.quantity ?? 0) > 0;
-      case InventoryCategory.fabric:
-        return state.fabric.type?.isNotEmpty == true &&
-            state.fabric.pattern?.isNotEmpty == true &&
-            state.fabric.color?.isNotEmpty == true;
-      case InventoryCategory.frameStructure:
-        return state.frame.type?.isNotEmpty == true &&
-            state.frame.material?.isNotEmpty == true &&
-            state.frame.dimensions?.isNotEmpty == true;
-      case InventoryCategory.carpet:
-        return state.carpet.type?.isNotEmpty == true &&
-            state.carpet.material?.isNotEmpty == true &&
-            state.carpet.size?.isNotEmpty == true;
-      case InventoryCategory.thermocol:
-        return state.thermocol.type?.isNotEmpty == true &&
-            state.thermocol.dimensions?.isNotEmpty == true &&
-            (state.thermocol.density ?? 0) > 0;
-      case InventoryCategory.stationery:
-        return state.stationery.name?.isNotEmpty == true &&
-            state.stationery.category?.isNotEmpty == true &&
-            (state.stationery.quantity ?? 0) > 0;
-      case InventoryCategory.murtiSet:
-        return state.murti.deity?.isNotEmpty == true &&
-            state.murti.material?.isNotEmpty == true;
-      case null:
-        return false;
     }
   }
 }
 
-final inventoryFormNotifierProvider = StateNotifierProvider<InventoryFormNotifier, InventoryFormState>((ref) {
+final inventoryFormNotifierProvider =
+    StateNotifierProvider<InventoryFormNotifier, InventoryFormState>((ref) {
   return InventoryFormNotifier();
 });
 
 class InventoryFormState {
-  final InventoryCategory? selectedCategory;
+  final CategoryModel? selectedCategory;
   final FurnitureData furniture;
   final FabricData fabric;
   final FrameData frame;
@@ -241,6 +337,7 @@ class InventoryFormState {
   final MurtiData murti;
   final Uint8List? imageBytes;
   final String? imageName;
+  final String? imagePath;
   final String? location;
 
   const InventoryFormState({
@@ -254,11 +351,12 @@ class InventoryFormState {
     this.murti = const MurtiData(),
     this.imageBytes,
     this.imageName,
+    this.imagePath,
     this.location,
   });
 
   InventoryFormState copyWith({
-    InventoryCategory? selectedCategory,
+    CategoryModel? selectedCategory,
     FurnitureData? furniture,
     FabricData? fabric,
     FrameData? frame,
@@ -268,6 +366,7 @@ class InventoryFormState {
     MurtiData? murti,
     Uint8List? imageBytes,
     String? imageName,
+    String? imagePath,
     String? location,
   }) {
     return InventoryFormState(
@@ -281,6 +380,7 @@ class InventoryFormState {
       murti: murti ?? this.murti,
       imageBytes: imageBytes ?? this.imageBytes,
       imageName: imageName ?? this.imageName,
+      imagePath: imagePath ?? this.imagePath,
       location: location ?? this.location,
     );
   }
@@ -288,83 +388,111 @@ class InventoryFormState {
 
 class FurnitureData {
   final String? name;
-  final String? category;
   final String? material;
   final String? dimensions;
+  final String? unit;
+  final String? notes;
+  final String? storageLocation;
   final int? quantity;
-  final String? location;
 
   const FurnitureData({
     this.name,
-    this.category,
     this.material,
     this.dimensions,
+    this.unit,
+    this.notes,
+    this.storageLocation,
     this.quantity,
-    this.location,
   });
 
   FurnitureData copyWith({
     String? name,
-    String? category,
     String? material,
     String? dimensions,
+    String? unit,
+    String? notes,
+    String? storageLocation,
     int? quantity,
-    String? location,
   }) {
     return FurnitureData(
       name: name ?? this.name,
-      category: category ?? this.category,
       material: material ?? this.material,
       dimensions: dimensions ?? this.dimensions,
+      unit: unit ?? this.unit,
+      notes: notes ?? this.notes,
+      storageLocation: storageLocation ?? this.storageLocation,
       quantity: quantity ?? this.quantity,
-      location: location ?? this.location,
     );
   }
 }
 
 class FabricData {
+  final String? name;
   final String? type;
   final String? pattern;
-  final String? color;
   final double? width;
   final double? length;
-  final int? stock;
+  final String? color;
+  final String? unit;
+  final String? storageLocation;
+  final String? notes;
+  final double? stock;
 
   const FabricData({
+    this.name,
     this.type,
     this.pattern,
-    this.color,
     this.width,
     this.length,
+    this.color,
+    this.unit,
+    this.storageLocation,
+    this.notes,
     this.stock,
   });
 
   FabricData copyWith({
+    String? name,
     String? type,
     String? pattern,
-    String? color,
     double? width,
     double? length,
-    int? stock,
+    String? color,
+    String? unit,
+    String? storageLocation,
+    String? notes,
+    double? stock,
   }) {
     return FabricData(
+      name: name ?? this.name,
       type: type ?? this.type,
       pattern: pattern ?? this.pattern,
-      color: color ?? this.color,
       width: width ?? this.width,
       length: length ?? this.length,
+      color: color ?? this.color,
+      unit: unit ?? this.unit,
+      storageLocation: storageLocation ?? this.storageLocation,
+      notes: notes ?? this.notes,
       stock: stock ?? this.stock,
     );
   }
 }
 
 class FrameData {
+  final String? name;
+  final String? unit;
+  final String? storageLocation;
+  final String? notes;
   final String? type;
   final String? material;
   final String? dimensions;
   final int? quantity;
 
   const FrameData({
+    this.name,
+    this.unit,
+    this.storageLocation,
+    this.notes,
     this.type,
     this.material,
     this.dimensions,
@@ -372,12 +500,20 @@ class FrameData {
   });
 
   FrameData copyWith({
+    String? name,
+    String? unit,
+    String? storageLocation,
+    String? notes,
     String? type,
     String? material,
     String? dimensions,
     int? quantity,
   }) {
     return FrameData(
+      name: name ?? this.name,
+      unit: unit ?? this.unit,
+      storageLocation: storageLocation ?? this.storageLocation,
+      notes: notes ?? this.notes,
       type: type ?? this.type,
       material: material ?? this.material,
       dimensions: dimensions ?? this.dimensions,
@@ -387,12 +523,20 @@ class FrameData {
 }
 
 class CarpetData {
+  final String? name;
+  final String? unit;
+  final String? storageLocation;
+  final String? notes;
   final String? type;
   final String? material;
   final String? size;
   final int? stock;
 
   const CarpetData({
+    this.name,
+    this.unit,
+    this.storageLocation,
+    this.notes,
     this.type,
     this.material,
     this.size,
@@ -400,12 +544,20 @@ class CarpetData {
   });
 
   CarpetData copyWith({
+    String? name,
+    String? unit,
+    String? storageLocation,
+    String? notes,
     String? type,
     String? material,
     String? size,
     int? stock,
   }) {
     return CarpetData(
+      name: name ?? this.name,
+      unit: unit ?? this.unit,
+      storageLocation: storageLocation ?? this.storageLocation,
+      notes: notes ?? this.notes,
       type: type ?? this.type,
       material: material ?? this.material,
       size: size ?? this.size,
@@ -415,93 +567,125 @@ class CarpetData {
 }
 
 class ThermocolData {
-  final String? type;
+  final String? name;
+  final String? unit;
+  final String? storageLocation;
+  final String? notes;
+  final int? quantity;
+  final String? thermocolType;
   final String? dimensions;
   final double? density;
-  final int? stock;
 
   const ThermocolData({
-    this.type,
+    this.name,
+    this.unit,
+    this.storageLocation,
+    this.notes,
+    this.quantity,
+    this.thermocolType,
     this.dimensions,
     this.density,
-    this.stock,
   });
 
   ThermocolData copyWith({
-    String? type,
+    String? name,
+    String? unit,
+    String? storageLocation,
+    String? notes,
+    int? quantity,
+    String? thermocolType,
     String? dimensions,
     double? density,
-    int? stock,
   }) {
     return ThermocolData(
-      type: type ?? this.type,
+      name: name ?? this.name,
+      unit: unit ?? this.unit,
+      storageLocation: storageLocation ?? this.storageLocation,
+      notes: notes ?? this.notes,
+      quantity: quantity ?? this.quantity,
+      thermocolType: thermocolType ?? this.thermocolType,
       dimensions: dimensions ?? this.dimensions,
       density: density ?? this.density,
-      stock: stock ?? this.stock,
     );
   }
 }
 
 class StationeryData {
   final String? name;
-  final String? category;
-  final String? specs;
   final String? unit;
+  final String? storageLocation;
+  final String? notes;
   final int? quantity;
+  final String? specifications;
 
   const StationeryData({
     this.name,
-    this.category,
-    this.specs,
     this.unit,
+    this.storageLocation,
+    this.notes,
     this.quantity,
+    this.specifications,
   });
 
   StationeryData copyWith({
     String? name,
-    String? category,
-    String? specs,
     String? unit,
+    String? storageLocation,
+    String? notes,
     int? quantity,
+    String? specifications,
   }) {
     return StationeryData(
       name: name ?? this.name,
-      category: category ?? this.category,
-      specs: specs ?? this.specs,
       unit: unit ?? this.unit,
+      storageLocation: storageLocation ?? this.storageLocation,
+      notes: notes ?? this.notes,
       quantity: quantity ?? this.quantity,
+      specifications: specifications ?? this.specifications,
     );
   }
 }
 
 class MurtiData {
-  final String? deity;
+  final String? name;
+  final String? unit;
+  final String? storageLocation;
+  final String? notes;
+  final int? quantity;
+  final String? setNumber;
   final String? material;
   final String? dimensions;
-  final double? weight;
-  final int? quantity;
 
   const MurtiData({
-    this.deity,
+    this.name,
+    this.unit,
+    this.storageLocation,
+    this.notes,
+    this.quantity,
+    this.setNumber,
     this.material,
     this.dimensions,
-    this.weight,
-    this.quantity,
   });
 
   MurtiData copyWith({
-    String? deity,
+    String? name,
+    String? unit,
+    String? storageLocation,
+    String? notes,
+    int? quantity,
+    String? setNumber,
     String? material,
     String? dimensions,
-    double? weight,
-    int? quantity,
   }) {
     return MurtiData(
-      deity: deity ?? this.deity,
+      name: name ?? this.name,
+      unit: unit ?? this.unit,
+      storageLocation: storageLocation ?? this.storageLocation,
+      notes: notes ?? this.notes,
+      quantity: quantity ?? this.quantity,
+      setNumber: setNumber ?? this.setNumber,
       material: material ?? this.material,
       dimensions: dimensions ?? this.dimensions,
-      weight: weight ?? this.weight,
-      quantity: quantity ?? this.quantity,
     );
   }
 }

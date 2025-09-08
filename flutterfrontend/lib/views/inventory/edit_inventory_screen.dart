@@ -1,5 +1,9 @@
+import 'package:avd_decoration_application/utils/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
+import 'dart:typed_data';
 import '../../themes/app_theme.dart';
 import '../../providers/inventory_provider.dart';
 
@@ -12,22 +16,94 @@ class EditInventoryPage extends ConsumerStatefulWidget {
 }
 
 class _EditInventoryPageState extends ConsumerState<EditInventoryPage> {
-  final nameCtrl = TextEditingController();
-  final categoryCtrl = TextEditingController();
-  final materialCtrl = TextEditingController();
-  final quantityCtrl = TextEditingController();
-  final locationCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  late InventoryItem item;
+  late String categoryName;
+
+  // Controllers for all possible fields
+  final nameCtrl = TextEditingController();
+  final unitCtrl = TextEditingController();
+  final storageLocationCtrl = TextEditingController();
+  final notesCtrl = TextEditingController();
+  final quantityCtrl = TextEditingController();
+  final materialCtrl = TextEditingController();
+  final dimensionsCtrl = TextEditingController();
+  final fabricTypeCtrl = TextEditingController();
+  final patternCtrl = TextEditingController();
+  final widthCtrl = TextEditingController();
+  final lengthCtrl = TextEditingController();
+  final colorCtrl = TextEditingController();
+  final carpetTypeCtrl = TextEditingController();
+  final sizeCtrl = TextEditingController();
+  final frameTypeCtrl = TextEditingController();
+  final setNumberCtrl = TextEditingController();
+  final specificationsCtrl = TextEditingController();
+  final thermocolTypeCtrl = TextEditingController();
+  final densityCtrl = TextEditingController();
+
+  // Image handling
+  Uint8List? imageBytes;
+  String? imagePath;
+  String? imageName;
 
   @override
   void initState() {
     super.initState();
-    final item = ref.read(inventoryProvider).firstWhere((i) => i.id == widget.itemId);
+    item = ref.read(inventoryProvider).firstWhere((i) => i.id == widget.itemId);
+    categoryName = item.categoryName.toLowerCase();
+    _initializeFormFields();
+  }
+
+  void _initializeFormFields() {
     nameCtrl.text = item.name;
-    categoryCtrl.text = item.category;
-    materialCtrl.text = item.material;
-    quantityCtrl.text = item.quantity.toString();
-    locationCtrl.text = item.location;
+    unitCtrl.text = item.unit;
+    storageLocationCtrl.text = item.storageLocation;
+    notesCtrl.text = item.notes;
+    quantityCtrl.text = item.availableQuantity.toString();
+
+    // Set category-specific fields based on the item's category
+    switch (categoryName) {
+      case 'furniture':
+        materialCtrl.text = item.material ?? '';
+        dimensionsCtrl.text = item.dimensions ?? '';
+        break;
+      case 'fabric':
+      case 'fabrics':
+        fabricTypeCtrl.text = item.fabricType ?? '';
+        patternCtrl.text = item.pattern ?? '';
+        widthCtrl.text = item.width?.toString() ?? '';
+        lengthCtrl.text = item.length?.toString() ?? '';
+        colorCtrl.text = item.color ?? '';
+        break;
+      case 'carpet':
+      case 'carpets':
+        carpetTypeCtrl.text = item.carpetType ?? '';
+        materialCtrl.text = item.material ?? '';
+        sizeCtrl.text = item.size ?? '';
+        break;
+      case 'frame structure':
+      case 'frame structures':
+        frameTypeCtrl.text = item.frameType ?? '';
+        materialCtrl.text = item.material ?? '';
+        dimensionsCtrl.text = item.dimensions ?? '';
+        break;
+      case 'murti set':
+      case 'murti sets':
+        setNumberCtrl.text = item.setNumber ?? '';
+        materialCtrl.text = item.material ?? '';
+        dimensionsCtrl.text = item.dimensions ?? '';
+        break;
+      case 'stationery':
+        specificationsCtrl.text = item.specifications ?? '';
+        break;
+      case 'thermocol':
+      case 'thermocol material':
+      case 'thermocol materials':
+        thermocolTypeCtrl.text = item.thermocolType ?? '';
+        dimensionsCtrl.text = item.dimensions ?? '';
+        densityCtrl.text = item.density?.toString() ?? '';
+        break;
+    }
   }
 
   @override
@@ -35,7 +111,9 @@ class _EditInventoryPageState extends ConsumerState<EditInventoryPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Edit Inventory', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text('Edit ${item.categoryName} Item',
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         centerTitle: true,
@@ -43,7 +121,7 @@ class _EditInventoryPageState extends ConsumerState<EditInventoryPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Main card like Add Year form
+          // Main card
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -71,22 +149,21 @@ class _EditInventoryPageState extends ConsumerState<EditInventoryPage> {
                           color: AppColors.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(Icons.edit, color: AppColors.primary, size: 20),
+                        child: Icon(Icons.edit,
+                            color: AppColors.primary, size: 20),
                       ),
                       const SizedBox(width: 12),
-                      Text('Update Inventory', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                      Text('Update ${item.categoryName} Item',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary)),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _formField('Name', nameCtrl, validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
-                  _formField('Category', categoryCtrl, validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
-                  _formField('Material', materialCtrl, validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
-                  _formField('Quantity', quantityCtrl, isNumber: true, validator: (v) {
-                    final n = int.tryParse(v ?? '');
-                    if (n == null || n < 0) return 'Enter valid quantity';
-                    return null;
-                  }),
-                  _formField('Location', locationCtrl),
+                  ..._buildCategoryFields(),
+                  const SizedBox(height: 16),
+                  _buildImagePicker(),
                 ],
               ),
             ),
@@ -101,7 +178,9 @@ class _EditInventoryPageState extends ConsumerState<EditInventoryPage> {
                 }
               },
               icon: const Icon(Icons.save),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white),
               label: const Text('Save Changes'),
             ),
           ),
@@ -110,48 +189,521 @@ class _EditInventoryPageState extends ConsumerState<EditInventoryPage> {
     );
   }
 
-  Widget _formField(String label, TextEditingController c, {bool isNumber = false, String? Function(String?)? validator}) {
+  List<Widget> _buildCategoryFields() {
+    switch (categoryName) {
+      case 'furniture':
+        return [
+          _buildTextField('Furniture Name', nameCtrl, required: true),
+          _buildTextField('Material', materialCtrl, required: true),
+          _buildTextField(
+              'Dimensions (e.g., 45cm x 45cm x 90cm)', dimensionsCtrl,
+              required: true),
+          _buildTextField('Unit (e.g., piece, set)', unitCtrl, required: true),
+          _buildTextField('Notes', notesCtrl, maxLines: 3),
+          _buildTextField('Storage Location', storageLocationCtrl,
+              required: true),
+          _buildTextField('Quantity Available', quantityCtrl,
+              keyboardType: TextInputType.number, required: true),
+        ];
+      case 'fabric':
+      case 'fabrics':
+        return [
+          _buildTextField('Fabric Name', nameCtrl, required: true),
+          _buildTextField('Fabric Type', fabricTypeCtrl, required: true),
+          _buildTextField('Pattern', patternCtrl, required: true),
+          _buildTextField('Width', widthCtrl,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              required: true),
+          _buildTextField('Length', lengthCtrl,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              required: true),
+          _buildTextField('Color', colorCtrl, required: true),
+          _buildTextField('Unit (e.g., meter, yard)', unitCtrl, required: true),
+          _buildTextField('Storage Location', storageLocationCtrl,
+              required: true),
+          _buildTextField('Notes', notesCtrl, maxLines: 3),
+          _buildTextField('Quantity Available', quantityCtrl,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              required: true),
+        ];
+      case 'carpet':
+      case 'carpets':
+        return [
+          _buildTextField('Carpet Name', nameCtrl, required: true),
+          _buildTextField('Unit (e.g., piece, set)', unitCtrl, required: true),
+          _buildTextField('Storage Location', storageLocationCtrl,
+              required: true),
+          _buildTextField('Notes', notesCtrl, maxLines: 3),
+          _buildTextField('Carpet Type', carpetTypeCtrl, required: true),
+          _buildTextField('Material', materialCtrl, required: true),
+          _buildTextField('Size', sizeCtrl, required: true),
+          _buildTextField('Quantity Available', quantityCtrl,
+              keyboardType: TextInputType.number, required: true),
+        ];
+      case 'frame structure':
+      case 'frame structures':
+        return [
+          _buildTextField('Frame Structure Name', nameCtrl, required: true),
+          _buildTextField('Unit (e.g., piece, set)', unitCtrl, required: true),
+          _buildTextField('Storage Location', storageLocationCtrl,
+              required: true),
+          _buildTextField('Notes', notesCtrl, maxLines: 3),
+          _buildTextField('Frame Type', frameTypeCtrl, required: true),
+          _buildTextField('Material', materialCtrl, required: true),
+          _buildTextField(
+              'Dimensions (e.g., 3.5m x 2.8m x 0.6m)', dimensionsCtrl,
+              required: true),
+          _buildTextField('Quantity Available', quantityCtrl,
+              keyboardType: TextInputType.number, required: true),
+        ];
+      case 'murti set':
+      case 'murti sets':
+        return [
+          _buildTextField('Murti Set Name', nameCtrl, required: true),
+          _buildTextField('Unit (e.g., set, piece)', unitCtrl, required: true),
+          _buildTextField('Storage Location', storageLocationCtrl,
+              required: true),
+          _buildTextField('Notes', notesCtrl, maxLines: 3),
+          _buildTextField('Set Number', setNumberCtrl, required: true),
+          _buildTextField('Material', materialCtrl, required: true),
+          _buildTextField('Dimensions (e.g., 8inch x 12inch)', dimensionsCtrl,
+              required: true),
+          _buildTextField('Quantity Available', quantityCtrl,
+              keyboardType: TextInputType.number, required: true),
+        ];
+      case 'stationery':
+        return [
+          _buildTextField('Stationery Name', nameCtrl, required: true),
+          _buildTextField('Unit (e.g., piece, set)', unitCtrl, required: true),
+          _buildTextField('Storage Location', storageLocationCtrl,
+              required: true),
+          _buildTextField('Notes', notesCtrl, maxLines: 3),
+          _buildTextField('Specifications', specificationsCtrl,
+              maxLines: 3, required: true),
+          _buildTextField('Quantity Available', quantityCtrl,
+              keyboardType: TextInputType.number, required: true),
+        ];
+      case 'thermocol':
+      case 'thermocol material':
+      case 'thermocol materials':
+        return [
+          _buildTextField('Thermocol Material Name', nameCtrl, required: true),
+          _buildTextField('Unit (e.g., set, piece)', unitCtrl, required: true),
+          _buildTextField('Storage Location', storageLocationCtrl,
+              required: true),
+          _buildTextField('Notes', notesCtrl, maxLines: 3),
+          _buildTextField('Thermocol Type', thermocolTypeCtrl, required: true),
+          _buildTextField(
+              'Dimensions (e.g., 70cm x 50cm x 12cm)', dimensionsCtrl,
+              required: true),
+          _buildTextField('Density', densityCtrl,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              required: true),
+          _buildTextField('Quantity Available', quantityCtrl,
+              keyboardType: TextInputType.number, required: true),
+        ];
+      default:
+        return [
+          _buildTextField('Item Name', nameCtrl, required: true),
+          _buildTextField('Unit', unitCtrl, required: true),
+          _buildTextField('Storage Location', storageLocationCtrl,
+              required: true),
+          _buildTextField('Notes', notesCtrl, maxLines: 3),
+          _buildTextField('Quantity Available', quantityCtrl,
+              keyboardType: TextInputType.number, required: true),
+        ];
+    }
+  }
+
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller, {
+    bool required = false,
+    TextInputType? keyboardType,
+    int? maxLines,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black12),
-      ),
+      margin: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
-        controller: c,
-        validator: validator,
-        keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+        controller: controller,
+        keyboardType: keyboardType,
+        maxLines: maxLines ?? 1,
+        validator: required
+            ? (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'This field is required';
+                }
+                return null;
+              }
+            : null,
         decoration: InputDecoration(
           labelText: label,
-          border: InputBorder.none,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.primary),
+          ),
+          filled: true,
+          fillColor: Colors.white,
         ),
       ),
     );
   }
 
-  void _save() {
-    final qty = int.tryParse(quantityCtrl.text.trim());
-    if (nameCtrl.text.trim().isEmpty || categoryCtrl.text.trim().isEmpty || materialCtrl.text.trim().isEmpty || qty == null || qty < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill valid values'), backgroundColor: Colors.red));
-      return;
+  Widget _buildImagePicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Update Image (optional)',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            ElevatedButton.icon(
+              onPressed: () async {
+                final result = await FilePicker.platform.pickFiles(
+                  type: FileType.image,
+                  allowMultiple: false,
+                  withData: false,
+                  allowCompression: false,
+                );
+
+                if (result != null && result.files.isNotEmpty) {
+                  final file = result.files.first;
+                  setState(() {
+                    imagePath = file.path;
+                    imageName = file.name;
+                    // Read bytes for preview if needed
+                    if (file.bytes != null) {
+                      imageBytes = file.bytes;
+                    }
+                  });
+                }
+              },
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Pick Image'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 12),
+            if (imagePath != null || item.itemImage != null)
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    imagePath = null;
+                    imageName = null;
+                    imageBytes = null;
+                  });
+                },
+                icon: const Icon(Icons.clear),
+                label: const Text('Clear'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+          ],
+        ),
+        if (imagePath != null || item.itemImage != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: imagePath != null
+                  ? Image.file(File(imagePath!), fit: BoxFit.cover)
+                  : item.itemImage != null
+                      ? Image.network(
+                          '$apiBaseUrl${item.itemImage}',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey.shade200,
+                              child: const Icon(Icons.image, size: 50),
+                            );
+                          },
+                        )
+                      : const Icon(Icons.image, size: 50),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _save() async {
+    if (_formKey.currentState?.validate() != true) return;
+
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Prepare form data based on category
+      final formData = _prepareFormData();
+
+      // Call appropriate update method based on category
+      switch (categoryName) {
+        case 'furniture':
+          await ref.read(inventoryProvider.notifier).updateFurnitureItem(
+                id: int.parse(item.id),
+                name: formData['name'],
+                material: formData['material'],
+                dimensions: formData['dimensions'],
+                unit: formData['unit'],
+                notes: formData['notes'],
+                storageLocation: formData['storage_location'],
+                quantityAvailable: formData['quantity_available'],
+                itemImagePath: imagePath,
+                itemImageBytes: imageBytes,
+                itemImageName: imageName,
+              );
+          break;
+        case 'carpet':
+        case 'carpets':
+          await ref.read(inventoryProvider.notifier).updateCarpetItem(
+                id: int.parse(item.id),
+                name: formData['name'],
+                unit: formData['unit'],
+                storageLocation: formData['storage_location'],
+                notes: formData['notes'],
+                quantityAvailable: formData['quantity_available'],
+                carpetType: formData['carpet_type'],
+                material: formData['material'],
+                size: formData['size'],
+                itemImagePath: imagePath,
+                itemImageBytes: imageBytes,
+                itemImageName: imageName,
+              );
+          break;
+        case 'fabric':
+        case 'fabrics':
+          await ref.read(inventoryProvider.notifier).updateFabricItem(
+                id: int.parse(item.id),
+                name: formData['name'],
+                unit: formData['unit'],
+                storageLocation: formData['storage_location'],
+                notes: formData['notes'],
+                quantityAvailable: formData['quantity_available'],
+                fabricType: formData['fabric_type'],
+                pattern: formData['pattern'],
+                width: formData['width'],
+                length: formData['length'],
+                color: formData['color'],
+                itemImagePath: imagePath,
+                itemImageBytes: imageBytes,
+                itemImageName: imageName,
+              );
+          break;
+        case 'frame structure':
+        case 'frame structures':
+          await ref.read(inventoryProvider.notifier).updateFrameStructureItem(
+                id: int.parse(item.id),
+                name: formData['name'],
+                unit: formData['unit'],
+                storageLocation: formData['storage_location'],
+                notes: formData['notes'],
+                quantityAvailable: formData['quantity_available'],
+                frameType: formData['frame_type'],
+                material: formData['material'],
+                dimensions: formData['dimensions'],
+                itemImagePath: imagePath,
+                itemImageBytes: imageBytes,
+                itemImageName: imageName,
+              );
+          break;
+        case 'thermocol':
+        case 'thermocol material':
+        case 'thermocol materials':
+          await ref
+              .read(inventoryProvider.notifier)
+              .updateThermocolMaterialsItem(
+                id: int.parse(item.id),
+                name: formData['name'],
+                unit: formData['unit'],
+                storageLocation: formData['storage_location'],
+                notes: formData['notes'],
+                quantityAvailable: formData['quantity_available'],
+                thermocolType: formData['thermocol_type'],
+                density: formData['density'],
+                dimensions: formData['dimensions'],
+                itemImagePath: imagePath,
+                itemImageBytes: imageBytes,
+                itemImageName: imageName,
+              );
+          break;
+        case 'murti set':
+        case 'murti sets':
+          await ref.read(inventoryProvider.notifier).updateMurtiSetsItem(
+                id: int.parse(item.id),
+                name: formData['name'],
+                unit: formData['unit'],
+                storageLocation: formData['storage_location'],
+                notes: formData['notes'],
+                quantityAvailable: formData['quantity_available'],
+                setNumber: formData['set_number'],
+                material: formData['material'],
+                dimensions: formData['dimensions'],
+                itemImagePath: imagePath,
+                itemImageBytes: imageBytes,
+                itemImageName: imageName,
+              );
+          break;
+        case 'stationery':
+          await ref.read(inventoryProvider.notifier).updateStationeryItem(
+                id: int.parse(item.id),
+                name: formData['name'],
+                unit: formData['unit'],
+                storageLocation: formData['storage_location'],
+                notes: formData['notes'],
+                quantityAvailable: formData['quantity_available'],
+                specifications: formData['specifications'],
+                itemImagePath: imagePath,
+                itemImageBytes: imageBytes,
+                itemImageName: imageName,
+              );
+          break;
+        default:
+          // For other categories, use general update method for now
+          final updated = item.copyWith(
+            name: formData['name'],
+            unit: formData['unit'],
+            storageLocation: formData['storage_location'],
+            notes: formData['notes'],
+            availableQuantity: formData['quantity_available'],
+          );
+          await ref
+              .read(inventoryProvider.notifier)
+              .updateItem(updated.id, updated.toMap());
+      }
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message and navigate back
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Item updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating item: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Map<String, dynamic> _prepareFormData() {
+    final data = {
+      'name': nameCtrl.text.trim(),
+      'unit': unitCtrl.text.trim(),
+      'storage_location': storageLocationCtrl.text.trim(),
+      'notes': notesCtrl.text.trim(),
+      'quantity_available': double.tryParse(quantityCtrl.text.trim()) ?? 0.0,
+    };
+
+    // Add category-specific fields
+    switch (categoryName) {
+      case 'furniture':
+        data['material'] = materialCtrl.text.trim();
+        data['dimensions'] = dimensionsCtrl.text.trim();
+        break;
+      case 'fabric':
+      case 'fabrics':
+        data['fabric_type'] = fabricTypeCtrl.text.trim();
+        data['pattern'] = patternCtrl.text.trim();
+        data['width'] = double.tryParse(widthCtrl.text.trim()) ?? 0.0;
+        data['length'] = double.tryParse(lengthCtrl.text.trim()) ?? 0.0;
+        data['color'] = colorCtrl.text.trim();
+        break;
+      case 'carpet':
+      case 'carpets':
+        data['carpet_type'] = carpetTypeCtrl.text.trim();
+        data['material'] = materialCtrl.text.trim();
+        data['size'] = sizeCtrl.text.trim();
+        break;
+      case 'frame structure':
+      case 'frame structures':
+        data['frame_type'] = frameTypeCtrl.text.trim();
+        data['material'] = materialCtrl.text.trim();
+        data['dimensions'] = dimensionsCtrl.text.trim();
+        break;
+      case 'murti set':
+      case 'murti sets':
+        data['set_number'] = setNumberCtrl.text.trim();
+        data['material'] = materialCtrl.text.trim();
+        data['dimensions'] = dimensionsCtrl.text.trim();
+        break;
+      case 'stationery':
+        data['specifications'] = specificationsCtrl.text.trim();
+        break;
+      case 'thermocol':
+      case 'thermocol material':
+      case 'thermocol materials':
+        data['thermocol_type'] = thermocolTypeCtrl.text.trim();
+        data['dimensions'] = dimensionsCtrl.text.trim();
+        data['density'] = double.tryParse(densityCtrl.text.trim()) ?? 0.0;
+        break;
     }
 
-    final current = ref.read(inventoryProvider).firstWhere((i) => i.id == widget.itemId);
-    final updated = current.copyWith(
-      name: nameCtrl.text.trim(),
-      category: categoryCtrl.text.trim(),
-      material: materialCtrl.text.trim(),
-      quantity: qty,
-      location: locationCtrl.text.trim(),
-      lastUpdated: DateTime.now().toString().split(' ')[0],
-      status: qty > 5 ? 'In Stock' : (qty == 0 ? 'Out of Stock' : 'Low Stock'),
-    );
-    ref.read(inventoryProvider.notifier).updateItem(updated.id, updated);
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Inventory updated'), backgroundColor: Colors.green));
+    return data;
+  }
+
+  @override
+  void dispose() {
+    nameCtrl.dispose();
+    unitCtrl.dispose();
+    storageLocationCtrl.dispose();
+    notesCtrl.dispose();
+    quantityCtrl.dispose();
+    materialCtrl.dispose();
+    dimensionsCtrl.dispose();
+    fabricTypeCtrl.dispose();
+    patternCtrl.dispose();
+    widthCtrl.dispose();
+    lengthCtrl.dispose();
+    colorCtrl.dispose();
+    carpetTypeCtrl.dispose();
+    sizeCtrl.dispose();
+    frameTypeCtrl.dispose();
+    setNumberCtrl.dispose();
+    specificationsCtrl.dispose();
+    thermocolTypeCtrl.dispose();
+    densityCtrl.dispose();
+    super.dispose();
   }
 }
-
-

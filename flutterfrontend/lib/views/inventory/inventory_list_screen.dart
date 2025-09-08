@@ -16,14 +16,15 @@ class InventoryListScreen extends ConsumerStatefulWidget {
   const InventoryListScreen({super.key});
 
   @override
-  ConsumerState<InventoryListScreen> createState() => _InventoryListScreenState();
+  ConsumerState<InventoryListScreen> createState() =>
+      _InventoryListScreenState();
 }
 
 class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
-
   @override
   Widget build(BuildContext context) {
     final inventoryItems = ref.watch(inventoryProvider);
+    final inventoryNotifier = ref.watch(inventoryProvider.notifier);
     final currentUser = ref.watch(authProvider);
     final isAdmin = currentUser?.role == 'admin';
     return Scaffold(
@@ -41,7 +42,7 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
         elevation: 0,
         foregroundColor: Colors.white,
         centerTitle: true,
-                 actions: [
+        actions: [
           //  IconButton(
           //    onPressed: () {
           //      // TODO: Implement search functionality
@@ -54,17 +55,17 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
           //    },
           //    icon: const Icon(Icons.filter_list),
           //  ),
-           IconButton(
-             onPressed: () => _navigateToIssuedItemsScreen(),
-             icon: const Icon(Icons.history),
-             tooltip: 'View Issued Items',
-           ),
-           IconButton(
-             onPressed: () => _showLogoutDialog(context),
-             icon: const Icon(Icons.logout),
-             tooltip: 'Logout',
-           ),
-         ],
+          IconButton(
+            onPressed: () => _navigateToIssuedItemsScreen(),
+            icon: const Icon(Icons.history),
+            tooltip: 'View Issued Items',
+          ),
+          IconButton(
+            onPressed: () => _showLogoutDialog(context),
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -117,7 +118,7 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
                     Expanded(
                       child: _buildStatCard(
                         title: 'Total Items',
-                        value: inventoryItems.length.toString(),
+                        value: inventoryNotifier.totalItemsCount.toString(),
                         icon: Icons.inventory,
                         color: AppColors.primary,
                       ),
@@ -126,7 +127,8 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
                     Expanded(
                       child: _buildStatCard(
                         title: 'Categories',
-                        value: '7',
+                        value:
+                            inventoryNotifier.totalCategoriesCount.toString(),
                         icon: Icons.category,
                         color: Colors.orange,
                       ),
@@ -135,7 +137,7 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
                     Expanded(
                       child: _buildStatCard(
                         title: 'Low Stock',
-                        value: inventoryItems.where((item) => item.status == 'Low Stock').length.toString(),
+                        value: inventoryNotifier.lowStockCount.toString(),
                         icon: Icons.warning,
                         color: Colors.red,
                       ),
@@ -182,75 +184,159 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
             ),
             const SizedBox(height: 16),
           ],
-          
+
           // Inventory List
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(24),
-              itemCount: inventoryItems.length,
-              itemBuilder: (context, index) {
-                final item = inventoryItems[index];
-                return _buildInventoryCard(item.toMap(), isAdmin);
-              },
-            ),
+            child: inventoryNotifier.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : inventoryNotifier.error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 64,
+                              color: Colors.red[300],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Error loading inventory',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red[700],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              inventoryNotifier.error!,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () =>
+                                  inventoryNotifier.refreshInventoryData(),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : inventoryItems.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No inventory items found',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Add some items to get started',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: () async {
+                              await inventoryNotifier.loadInventoryData();
+                            },
+                            child: ListView.builder(
+                              padding: const EdgeInsets.all(24),
+                              itemCount: inventoryItems.length,
+                              itemBuilder: (context, index) {
+                                final item = inventoryItems[index];
+                                return _buildInventoryCard(item, isAdmin);
+                              },
+                            ),
+                          ),
           ),
         ],
       ),
-                   floatingActionButton: isAdmin ? FloatingActionButton.extended(
-        heroTag: "inventory_add_button", // Added unique hero tag
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const InventoryFormPage(),
-            ),
-          );
-         
-         // Handle the result from form submission
-         print('Form result received: $result');
-         if (result != null && result is Map<String, dynamic>) {
-           print('Result is valid map, adding to inventory');
-           
-           // Create new inventory item
-           final newItem = InventoryItem(
-             id: DateTime.now().millisecondsSinceEpoch.toString(),
-             name: result['name'] ?? 'New Item',
-             category: result['category'] ?? 'Unknown',
-             material: result['material'] ?? 'Unknown',
-             quantity: result['quantity'] ?? 1,
-             location: result['location'] ?? 'Unknown',
-             lastUpdated: DateTime.now().toString().split(' ')[0],
-             status: (result['quantity'] ?? 0) > 5 ? 'In Stock' : 'Low Stock',
-             imageBytes: result['imageBytes'] != null ? Uint8List.fromList(result['imageBytes']) : null,
-             imageName: result['imageName'],
-           );
-           
-           print('New item created: ${newItem.toMap()}');
-           
-           // Add to provider
-           ref.read(inventoryProvider.notifier).addItem(newItem);
-           print('Inventory items count: ${inventoryItems.length}');
-           
-           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(
-               content: Text('${result['name']} added to inventory successfully!'),
-               backgroundColor: Colors.green,
-               behavior: SnackBarBehavior.floating,
-               shape: RoundedRectangleBorder(
-                 borderRadius: BorderRadius.circular(12),
-               ),
-             ),
-           );
-         } else {
-           print('Result is null or not a map: $result');
-         }
-       },
-       backgroundColor: AppColors.primary,
-       foregroundColor: Colors.white,
-       icon: const Icon(Icons.add),
-       label: const Text('Add Inventory'),
-       elevation: 4,
-     ) : null,
+      floatingActionButton: isAdmin
+          ? FloatingActionButton.extended(
+              heroTag: "inventory_add_button", // Added unique hero tag
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const InventoryFormPage(),
+                  ),
+                );
+
+                // Handle the result from form submission
+                print('Form result received: $result');
+                if (result != null && result is Map<String, dynamic>) {
+                  print('Result is valid map, adding to inventory');
+
+                  // Create new inventory item
+                  final newItem = InventoryItem(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    name: result['name'] ?? 'New Item',
+                    category: '1', // Default category ID
+                    categoryName: result['category'] ?? 'Unknown',
+                    unit: 'piece', // Default unit
+                    storageLocation: result['location'] ?? 'Unknown',
+                    notes: result['notes'] ?? '',
+                    availableQuantity: (result['quantity'] ?? 1).toDouble(),
+                    material: result['material'] ?? 'Unknown',
+                    createdAt: DateTime.now().toIso8601String(),
+                    status: (result['quantity'] ?? 0) > 5
+                        ? 'In Stock'
+                        : 'Low Stock',
+                    imageBytes: result['imageBytes'] != null
+                        ? Uint8List.fromList(result['imageBytes'])
+                        : null,
+                    imageName: result['imageName'],
+                  );
+
+                  print('New item created: ${newItem.toMap()}');
+
+                  // Add to provider
+                  ref.read(inventoryProvider.notifier).addItem(newItem.toMap());
+                  print('Inventory items count: ${inventoryItems.length}');
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                          '${result['name']} added to inventory successfully!'),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  );
+                } else {
+                  print('Result is null or not a map: $result');
+                }
+              },
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Inventory'),
+              elevation: 4,
+            )
+          : null,
     );
   }
 
@@ -305,7 +391,7 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
     );
   }
 
-    Widget _buildInventoryCard(Map<String, dynamic> item, bool isAdmin) {
+  Widget _buildInventoryCard(InventoryItem item, bool isAdmin) {
     return Opacity(
       opacity: isAdmin ? 1.0 : 0.7,
       child: Container(
@@ -331,14 +417,33 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              _getCategoryIcon(item['category']),
-              color: AppColors.primary,
-              size: 24,
-            ),
+            child: item.itemImage != null && item.itemImage!.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      ref
+                          .read(inventoryServiceProvider)
+                          .getImageUrl(item.itemImage),
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Icon(
+                          _getCategoryIcon(item.categoryName),
+                          color: AppColors.primary,
+                          size: 24,
+                        );
+                      },
+                    ),
+                  )
+                : Icon(
+                    _getCategoryIcon(item.categoryName),
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
           ),
           title: Text(
-            item['name'],
+            item.name,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -350,7 +455,7 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
             children: [
               const SizedBox(height: 8),
               Text(
-                '${item['category']} • ${item['material']}',
+                '${item.categoryName} • ${item.unit}',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -367,7 +472,7 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      item['location'],
+                      item.storageLocation,
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[500],
@@ -386,25 +491,25 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(item['status']).withOpacity(0.1),
+                  color: _getStatusColor(_getItemStatus(item)).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: _getStatusColor(item['status']),
+                    color: _getStatusColor(_getItemStatus(item)),
                     width: 1,
                   ),
                 ),
                 child: Text(
-                  item['status'],
+                  _getItemStatus(item),
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: _getStatusColor(item['status']),
+                    color: _getStatusColor(_getItemStatus(item)),
                   ),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                'Qty: ${item['quantity']}',
+                'Qty: ${item.availableQuantity.toStringAsFixed(0)}',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -413,18 +518,32 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
               ),
             ],
           ),
-          onTap: isAdmin ? () {
-            _showItemOptions(context, item);
-          } : null,
+          onTap: isAdmin
+              ? () {
+                  _showItemOptions(context, item.toMap());
+                }
+              : null,
         ),
       ),
     );
   }
 
+  // Helper method to get item status based on quantity
+  String _getItemStatus(InventoryItem item) {
+    final quantity = item.availableQuantity;
+    if (quantity <= 0) {
+      return 'Out of Stock';
+    } else if (quantity <= 5) {
+      return 'Low Stock';
+    } else {
+      return 'In Stock';
+    }
+  }
+
   void _showItemOptions(BuildContext context, Map<String, dynamic> item) {
     final currentUser = ref.read(authProvider);
     final isAdmin = currentUser?.role == 'admin';
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -511,26 +630,62 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Delete ${item['name']}?'),
-        content: Text('Are you sure you want to delete this item? This action cannot be undone.'),
+        content: Text(
+            'Are you sure you want to delete this item? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              ref.read(inventoryProvider.notifier).deleteItem(item['id']);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${item['name']} deleted successfully!'),
-                  backgroundColor: Colors.red,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+            onPressed: () async {
+              Navigator.pop(context); // Close dialog first
+
+              // Show loading indicator
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(
+                  child: CircularProgressIndicator(),
                 ),
               );
+
+              try {
+                await ref.read(inventoryProvider.notifier).deleteInventoryItem(
+                      id: int.parse(item['id'].toString()),
+                    );
+
+                // Close loading dialog
+                Navigator.pop(context);
+
+                // Show success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${item['name']} deleted successfully!'),
+                    backgroundColor: Colors.green,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                );
+              } catch (e) {
+                // Close loading dialog
+                Navigator.pop(context);
+
+                // Show error message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                        'Failed to delete ${item['name']}: ${e.toString()}'),
+                    backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                );
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Delete'),
@@ -540,24 +695,24 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
     );
   }
 
-     void _issueToEvent(Map<String, dynamic> item) {
-     print('Opening issue screen for item: ${item['name']}');
-     Navigator.push(
-       context,
-       MaterialPageRoute(
-         builder: (context) => IssueInventoryPage(inventoryItem: item),
-       ),
-     );
-   }
+  void _issueToEvent(Map<String, dynamic> item) {
+    print('Opening issue screen for item: ${item['name']}');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => IssueInventoryPage(inventoryItem: item),
+      ),
+    );
+  }
 
-   void _navigateToIssuedItemsScreen() {
-     Navigator.push(
-       context,
-       MaterialPageRoute(
-         builder: (context) => const IssuedItemsPage(),
-       ),
-     );
-   }
+  void _navigateToIssuedItemsScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const IssuedItemsPage(),
+      ),
+    );
+  }
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
@@ -587,14 +742,14 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
     try {
       final authNotifier = ref.read(authProvider.notifier);
       await authNotifier.logout();
-      
+
       // Navigate back to login
       Navigator.pushNamedAndRemoveUntil(
         context,
         '/login',
         (route) => false,
       );
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Logged out successfully'),
@@ -643,23 +798,24 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
         return Colors.red;
       default:
         return Colors.grey;
-         }
-   }
- }
+    }
+  }
+}
 
 // Issued Items List Screen
 class IssuedItemsListScreen extends ConsumerStatefulWidget {
   const IssuedItemsListScreen({super.key});
 
   @override
-  ConsumerState<IssuedItemsListScreen> createState() => _IssuedItemsListScreenState();
+  ConsumerState<IssuedItemsListScreen> createState() =>
+      _IssuedItemsListScreenState();
 }
 
 class _IssuedItemsListScreenState extends ConsumerState<IssuedItemsListScreen> {
   @override
   Widget build(BuildContext context) {
     final issuedItems = ref.watch(inventoryProvider.notifier).issuedItems;
-    
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -736,7 +892,11 @@ class _IssuedItemsListScreenState extends ConsumerState<IssuedItemsListScreen> {
                     Expanded(
                       child: _buildStatCard(
                         title: 'Unique Items',
-                        value: issuedItems.map((item) => item['itemId']).toSet().length.toString(),
+                        value: issuedItems
+                            .map((item) => item['itemId'])
+                            .toSet()
+                            .length
+                            .toString(),
                         icon: Icons.category,
                         color: Colors.blue,
                       ),
@@ -745,7 +905,11 @@ class _IssuedItemsListScreenState extends ConsumerState<IssuedItemsListScreen> {
                     Expanded(
                       child: _buildStatCard(
                         title: 'Events',
-                        value: issuedItems.map((item) => item['eventName']).toSet().length.toString(),
+                        value: issuedItems
+                            .map((item) => item['eventName'])
+                            .toSet()
+                            .length
+                            .toString(),
                         icon: Icons.event,
                         color: Colors.purple,
                       ),
@@ -755,18 +919,25 @@ class _IssuedItemsListScreenState extends ConsumerState<IssuedItemsListScreen> {
               ],
             ),
           ),
-          
+
           // Issued Items List
           Expanded(
             child: issuedItems.isEmpty
                 ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.all(24),
-                    itemCount: issuedItems.length,
-                    itemBuilder: (context, index) {
-                      final item = issuedItems[index];
-                      return _buildIssuedItemCard(item);
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      await ref
+                          .read(inventoryProvider.notifier)
+                          .loadInventoryData();
                     },
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(24),
+                      itemCount: issuedItems.length,
+                      itemBuilder: (context, index) {
+                        final item = issuedItems[index];
+                        return _buildIssuedItemCard(item);
+                      },
+                    ),
                   ),
           ),
         ],
@@ -863,7 +1034,8 @@ class _IssuedItemsListScreenState extends ConsumerState<IssuedItemsListScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
           ],
@@ -1002,7 +1174,8 @@ class InventoryIssueScreen extends ConsumerStatefulWidget {
   const InventoryIssueScreen({super.key, required this.inventoryItem});
 
   @override
-  ConsumerState<InventoryIssueScreen> createState() => _InventoryIssueScreenState();
+  ConsumerState<InventoryIssueScreen> createState() =>
+      _InventoryIssueScreenState();
 }
 
 class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
@@ -1118,7 +1291,8 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Icon(
-                                      _getCategoryIcon(widget.inventoryItem['category']),
+                                      _getCategoryIcon(
+                                          widget.inventoryItem['category']),
                                       color: AppColors.primary,
                                       size: 32,
                                     );
@@ -1126,7 +1300,8 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
                                 ),
                               )
                             : Icon(
-                                _getCategoryIcon(widget.inventoryItem['category']),
+                                _getCategoryIcon(
+                                    widget.inventoryItem['category']),
                                 color: AppColors.primary,
                                 size: 32,
                               ),
@@ -1146,7 +1321,8 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
                             ),
                             const SizedBox(height: 4),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: AppColors.primary.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
@@ -1188,7 +1364,8 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  widget.inventoryItem['location'] ?? 'No location',
+                                  widget.inventoryItem['location'] ??
+                                      'No location',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey[600],
@@ -1198,7 +1375,8 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
                             ),
                             const SizedBox(height: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: Colors.green.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
@@ -1293,14 +1471,16 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
                               : null,
                           icon: Icon(
                             Icons.remove_circle_outline,
-                            color: issueQuantity > 1 ? Colors.blue : Colors.grey,
+                            color:
+                                issueQuantity > 1 ? Colors.blue : Colors.grey,
                           ),
                         ),
                       ),
                       Expanded(
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 16),
-                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 24),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
@@ -1338,38 +1518,61 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: IconButton(
-                          onPressed: issueQuantity < widget.inventoryItem['quantity']
-                              ? () => setState(() => issueQuantity++)
-                              : null,
+                          onPressed:
+                              issueQuantity < widget.inventoryItem['quantity']
+                                  ? () => setState(() => issueQuantity++)
+                                  : null,
                           icon: Icon(
                             Icons.add_circle_outline,
-                            color: issueQuantity < widget.inventoryItem['quantity'] ? Colors.blue : Colors.grey,
+                            color:
+                                issueQuantity < widget.inventoryItem['quantity']
+                                    ? Colors.blue
+                                    : Colors.grey,
                           ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                                     Row(
-                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                     children: [
-                       Text(
-                         'Available: ${ref.watch(inventoryProvider).firstWhere((item) => item.id == widget.inventoryItem['id'], orElse: () => InventoryItem(id: '', name: '', category: '', material: '', quantity: 0, location: '', lastUpdated: '', status: '')).quantity}',
-                         style: TextStyle(
-                           fontSize: 14,
-                           color: Colors.grey[600],
-                         ),
-                       ),
-                       Text(
-                         'Remaining: ${ref.watch(inventoryProvider).firstWhere((item) => item.id == widget.inventoryItem['id'], orElse: () => InventoryItem(id: '', name: '', category: '', material: '', quantity: 0, location: '', lastUpdated: '', status: '')).quantity - issueQuantity}',
-                         style: TextStyle(
-                           fontSize: 14,
-                           fontWeight: FontWeight.w600,
-                           color: (ref.watch(inventoryProvider).firstWhere((item) => item.id == widget.inventoryItem['id'], orElse: () => InventoryItem(id: '', name: '', category: '', material: '', quantity: 0, location: '', lastUpdated: '', status: '')).quantity - issueQuantity) < 5 ? Colors.orange : Colors.green,
-                         ),
-                       ),
-                     ],
-                   ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Available: ${ref.watch(inventoryProvider).firstWhere((item) => item.id == widget.inventoryItem['id'], orElse: () => InventoryItem(id: '', name: '', category: '', categoryName: '', unit: '', storageLocation: '', notes: '', availableQuantity: 0.0)).availableQuantity}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      Text(
+                        'Remaining: ${(ref.watch(inventoryProvider).firstWhere((item) => item.id == widget.inventoryItem['id'], orElse: () => InventoryItem(id: '', name: '', category: '', categoryName: '', unit: '', storageLocation: '', notes: '', availableQuantity: 0.0)).availableQuantity) - issueQuantity}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: ((ref
+                                          .watch(inventoryProvider)
+                                          .firstWhere(
+                                              (item) =>
+                                                  item.id ==
+                                                  widget.inventoryItem['id'],
+                                              orElse: () => InventoryItem(
+                                                  id: '',
+                                                  name: '',
+                                                  category: '',
+                                                  categoryName: '',
+                                                  unit: '',
+                                                  storageLocation: '',
+                                                  notes: '',
+                                                  availableQuantity: 0.0))
+                                          .availableQuantity) -
+                                      issueQuantity) <
+                                  5
+                              ? Colors.orange
+                              : Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1418,57 +1621,57 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                                     if (currentEvents.isEmpty)
-                     Container(
-                       padding: const EdgeInsets.all(20),
-                       decoration: BoxDecoration(
-                         color: Colors.grey[100],
-                         borderRadius: BorderRadius.circular(12),
-                       ),
-                       child: Column(
-                         children: [
-                           Icon(
-                             Icons.event_busy,
-                             size: 48,
-                             color: Colors.grey[400],
-                           ),
-                           const SizedBox(height: 16),
-                           const Text(
-                             'No events available',
-                             style: TextStyle(
-                               color: Colors.grey,
-                               fontSize: 18,
-                               fontWeight: FontWeight.w600,
-                             ),
-                           ),
-                           const SizedBox(height: 8),
-                           Text(
-                             'Create some events first to issue inventory',
-                             style: TextStyle(
-                               color: Colors.grey[500],
-                               fontSize: 14,
-                             ),
-                             textAlign: TextAlign.center,
-                           ),
-                           const SizedBox(height: 16),
-                           ElevatedButton.icon(
-                             onPressed: () {
-                               Navigator.pop(context);
-                               // Navigate to events tab
-                               // This will be handled by the parent navigation
-                             },
-                             icon: const Icon(Icons.add),
-                             label: const Text('Create Event'),
-                             style: ElevatedButton.styleFrom(
-                               backgroundColor: AppColors.primary,
-                               foregroundColor: Colors.white,
-                             ),
-                           ),
-                         ],
-                       ),
-                     )
-                   else
-                     ...currentEvents.map((event) => _buildEventCard(event)),
+                  if (currentEvents.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.event_busy,
+                            size: 48,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No events available',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Create some events first to issue inventory',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              // Navigate to events tab
+                              // This will be handled by the parent navigation
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text('Create Event'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ...currentEvents.map((event) => _buildEventCard(event)),
                 ],
               ),
             ),
@@ -1597,9 +1800,8 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
                     : null,
               ),
               child: ElevatedButton(
-                onPressed: selectedEvent != null
-                    ? () => _issueInventory()
-                    : null,
+                onPressed:
+                    selectedEvent != null ? () => _issueInventory() : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
@@ -1639,7 +1841,7 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
 
   Widget _buildEventCard(Map<String, dynamic> event) {
     final isSelected = selectedEvent?['id'] == event['id'];
-    
+
     return GestureDetector(
       onTap: () => setState(() => selectedEvent = event),
       child: Container(
@@ -1652,13 +1854,15 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
             color: isSelected ? AppColors.primary : Colors.grey[300]!,
             width: isSelected ? 2 : 1,
           ),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ] : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           children: [
@@ -1768,7 +1972,9 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
               Text(
                 'Available after issue: ${widget.inventoryItem['quantity'] - issueQuantity}',
                 style: TextStyle(
-                  color: (widget.inventoryItem['quantity'] - issueQuantity) < 5 ? Colors.orange : Colors.green,
+                  color: (widget.inventoryItem['quantity'] - issueQuantity) < 5
+                      ? Colors.orange
+                      : Colors.green,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1799,11 +2005,11 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
   void _confirmIssue() {
     // Update inventory quantity using the provider
     ref.read(inventoryProvider.notifier).issueInventory(
-      widget.inventoryItem['id'],
-      issueQuantity,
-      selectedEvent!['name'],
-    );
-    
+          widget.inventoryItem['id'],
+          issueQuantity,
+          selectedEvent!['name'],
+        );
+
     // Show success message
     showDialog(
       context: context,
@@ -1888,236 +2094,242 @@ class _InventoryIssueScreenState extends ConsumerState<InventoryIssueScreen> {
     );
   }
 
-     IconData _getCategoryIcon(String category) {
-     switch (category) {
-       case 'Furniture':
-         return Icons.chair;
-       case 'Fabric':
-         return Icons.texture;
-       case 'Frame Structure':
-         return Icons.photo_library;
-       case 'Carpet':
-         return Icons.style;
-       case 'Thermocol Material':
-         return Icons.inbox;
-       case 'Stationery':
-         return Icons.edit;
-       case 'Murti Set':
-         return Icons.auto_awesome;
-       default:
-         return Icons.inventory;
-     }
-   }
-   
-       Widget _buildItemIssueHistory() {
-      final issuedItems = ref.read(inventoryProvider.notifier).issuedItems;
-      
-      // Filter items for this specific inventory item
-      final itemIssues = issuedItems.where((item) => item['itemId'] == widget.inventoryItem['id']).toList();
-      
-      if (itemIssues.isEmpty) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                Icons.inventory_2_outlined,
-                size: 48,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'No issues for this item yet',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'When you issue this item to events, they will appear here',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        );
-      }
-      
-      return Column(
-        children: itemIssues.map((issue) => Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Colors.orange.withOpacity(0.2),
-              width: 1,
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Furniture':
+        return Icons.chair;
+      case 'Fabric':
+        return Icons.texture;
+      case 'Frame Structure':
+        return Icons.photo_library;
+      case 'Carpet':
+        return Icons.style;
+      case 'Thermocol Material':
+        return Icons.inbox;
+      case 'Stationery':
+        return Icons.edit;
+      case 'Murti Set':
+        return Icons.auto_awesome;
+      default:
+        return Icons.inventory;
+    }
+  }
+
+  Widget _buildItemIssueHistory() {
+    final issuedItems = ref.read(inventoryProvider.notifier).issuedItems;
+
+    // Filter items for this specific inventory item
+    final itemIssues = issuedItems
+        .where((item) => item['itemId'] == widget.inventoryItem['id'])
+        .toList();
+
+    if (itemIssues.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 48,
+              color: Colors.grey[400],
             ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.event_note,
-                  color: Colors.orange,
-                  size: 16,
-                ),
+            const SizedBox(height: 16),
+            const Text(
+              'No issues for this item yet',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'When you issue this item to events, they will appear here',
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: itemIssues
+          .map((issue) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.orange.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
                   children: [
-                    Text(
-                      '${issue['quantity']} units issued',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.event_note,
+                        color: Colors.orange,
+                        size: 16,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Event: ${issue['eventName']}',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Date: ${issue['issueDate']} • Remaining: ${issue['remainingQuantity']}',
-                      style: TextStyle(
-                        color: Colors.grey[500],
-                        fontSize: 11,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${issue['quantity']} units issued',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Event: ${issue['eventName']}',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Date: ${issue['issueDate']} • Remaining: ${issue['remainingQuantity']}',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _buildIssuedItemsList() {
+    final issuedItems = ref.read(inventoryProvider.notifier).issuedItems;
+
+    if (issuedItems.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 48,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No items issued yet',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
-            ],
-          ),
-        )).toList(),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Issued items will appear here',
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       );
     }
-    
-    Widget _buildIssuedItemsList() {
-      final issuedItems = ref.read(inventoryProvider.notifier).issuedItems;
-      
-      if (issuedItems.isEmpty) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                Icons.inventory_2_outlined,
-                size: 48,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'No items issued yet',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Issued items will appear here',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        );
-      }
-      
-      // Show last 5 issued items
-      final recentItems = issuedItems.take(5).toList();
-      
-      return Column(
-        children: recentItems.map((item) => Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Colors.green.withOpacity(0.2),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
+
+    // Show last 5 issued items
+    final recentItems = issuedItems.take(5).toList();
+
+    return Column(
+      children: recentItems
+          .map((item) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.green.withOpacity(0.2),
+                    width: 1,
+                  ),
                 ),
-                child: Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text(
-                      '${item['quantity']} × ${item['itemName']}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 16,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Issued to: ${item['eventName']}',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Date: ${item['issueDate']} • Remaining: ${item['remainingQuantity']}',
-                      style: TextStyle(
-                        color: Colors.grey[500],
-                        fontSize: 11,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${item['quantity']} × ${item['itemName']}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Issued to: ${item['eventName']}',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Date: ${item['issueDate']} • Remaining: ${item['remainingQuantity']}',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-        )).toList(),
-      );
-    }
- }
+              ))
+          .toList(),
+    );
+  }
+}

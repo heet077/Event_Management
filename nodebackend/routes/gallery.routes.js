@@ -43,12 +43,19 @@ router.post('/design', upload.array('images', 10), async (req, res, next) => {
         
         console.log(`📁 Created local folder structure: ${designImagesDir}`);
         
+        // Get existing files to determine next file number
+        const existingFiles = fs.existsSync(designImagesDir) ? fs.readdirSync(designImagesDir) : [];
+        const existingDesignImages = existingFiles.filter(file => file.startsWith('design_images_'));
+        const nextFileNumber = existingDesignImages.length + 1;
+        
+        console.log(`📁 Found ${existingDesignImages.length} existing design images, starting from number ${nextFileNumber}`);
+        
         // Process each uploaded file
         for (let i = 0; i < req.files.length; i++) {
           const file = req.files[i];
           const filePath = file.path;
           const ext = path.extname(file.originalname);
-          const newFileName = `design_images_${i + 1}${ext}`;
+          const newFileName = `design_images_${nextFileNumber + i}${ext}`;
           const newPath = path.join(designImagesDir, newFileName);
           
           // Move the file to the design images folder
@@ -140,12 +147,19 @@ router.post('/final', upload.array('images', 10), async (req, res, next) => {
         
         console.log(`📁 Created local folder structure: ${finalImagesDir}`);
         
+        // Get existing files to determine next file number
+        const existingFiles = fs.existsSync(finalImagesDir) ? fs.readdirSync(finalImagesDir) : [];
+        const existingFinalImages = existingFiles.filter(file => file.startsWith('final_images_'));
+        const nextFileNumber = existingFinalImages.length + 1;
+        
+        console.log(`📁 Found ${existingFinalImages.length} existing final images, starting from number ${nextFileNumber}`);
+        
         // Process each uploaded file
         for (let i = 0; i < req.files.length; i++) {
           const file = req.files[i];
           const filePath = file.path;
           const ext = path.extname(file.originalname);
-          const newFileName = `final_images_${i + 1}${ext}`;
+          const newFileName = `final_images_${nextFileNumber + i}${ext}`;
           const newPath = path.join(finalImagesDir, newFileName);
           
           // Move the file to the final images folder
@@ -214,7 +228,7 @@ router.post('/final', upload.array('images', 10), async (req, res, next) => {
 
 
 
-// Parameterized route (must come last)
-router.post('/getEventImages', Gallery.getEventImages);
+// Get event images route (must come last)
+router.post('/event/images', Gallery.getEventImages);
 
 export default router;

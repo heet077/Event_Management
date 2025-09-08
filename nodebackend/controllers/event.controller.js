@@ -19,6 +19,20 @@ export const getEvents = async (req, res, next) => {
   }
 };
 
+export const getEventList = async (req, res, next) => {
+  try {
+    const data = await Event.getEventList();
+    res.json({
+      success: true,
+      message: 'Event list retrieved successfully',
+      data: data,
+      count: data.length
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getEvent = async (req, res, next) => {
   try {
     const { id } = req.body;
@@ -236,19 +250,44 @@ export const deleteEvent = async (req, res, next) => {
 
 export const getEventDetails = async (req, res, next) => {
   try {
-    const { id } = req.body;
+    const { id, template_id, year_id } = req.body;
     
-    if (!id) {
+    let event;
+    let event_id;
+    
+    // Check if we have template_id and year_id (new way)
+    if (template_id && year_id) {
+      event = await Event.getEventByTemplateAndYear(template_id, year_id);
+      if (!event) {
+        return res.status(404).json({
+          success: false,
+          message: 'Event not found',
+          details: [{ field: 'template_id, year_id', message: `Event with template_id ${template_id} and year_id ${year_id} does not exist` }]
+        });
+      }
+      event_id = event.id;
+    }
+    // Check if we have id (old way)
+    else if (id) {
+      event = await Event.getEventById(id);
+      if (!event) {
+        return res.status(404).json({
+          success: false,
+          message: 'Event not found',
+          details: [{ field: 'id', message: `Event with ID ${id} does not exist` }]
+        });
+      }
+      event_id = id;
+    }
+    // Neither way provided
+    else {
       return res.status(400).json({
         success: false,
-        message: 'Event ID is required',
-        details: [{ field: 'id', message: 'Event ID is required in request body' }]
+        message: 'Event identifier is required',
+        details: [{ field: 'id or template_id, year_id', message: 'Either event ID or template_id and year_id are required in request body' }]
       });
     }
     
-    const event_id = id;
-    // Fetch event details
-    const event = await Event.getEventById(event_id);
     // Fetch gallery (design and final images)
     const gallery = await Gallery.getImagesByEvent(event_id);
     // Fetch cost summary
@@ -257,10 +296,14 @@ export const getEventDetails = async (req, res, next) => {
     const issuances = await Issuance.getIssuancesByEvent(event_id);
 
     res.json({
-      event,
-      gallery,
-      cost,
-      issuances
+      success: true,
+      message: 'Event details retrieved successfully',
+      data: {
+        event,
+        gallery,
+        cost,
+        issuances
+      }
     });
   } catch (err) {
     next(err);
